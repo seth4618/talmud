@@ -43,6 +43,12 @@ Annotation.find = function(id, cb)
     cb(a);
 };
 
+Annotation.sfind = function(id)
+{
+    if (id in Annotation.all) return Annotation.all[id];
+    return new Annotation(id);
+};
+
 /**
  * getKey
  * get a key for this annotation
