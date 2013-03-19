@@ -140,7 +140,8 @@ function start()
         }
         for (var i=0; i<clr.length; i++) clr[i].val('');
         // now create the record
-        var s = new Source(Chooser.selection.source, name);
+        var s = new Source();
+        s.init(Chooser.selection.source, name);
         if (number != 0) s.number = number;
         s.type = Chooser.selection.source.getChildType();
         s.insert(function() { Chooser.selection.child.fill(); });
