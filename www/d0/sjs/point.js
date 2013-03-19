@@ -152,7 +152,7 @@ Color.prototype.rgba = function(a)
 
 /**
  * Shape
- * A general annotation that resides on the page
+ * A shape
  *
  * @constructor
  * @param {!Annotation} type
@@ -161,21 +161,15 @@ Color.prototype.rgba = function(a)
  **/
 function Shape(type, x, y)
 {
+    console.log('Creating '+x+','+y);
     this.type = type;
     this.xval = x;
     this.yval = y;
-    this.targets = {};
-    this.selected = false;
 }
 
-Shape.table = 'shape';
-/** @type {!Object.<!DataBaseObject.Key,!Shape>} */ Shape.all = {};
-
-/** @type {!Annotation} */ Shape.prototype.type;
-/** @type {boolean} */ Shape.prototype.selected;
-/** @type {Object.<!string,!Shape>} */ Shape.prototype.targets;
 /** @type {number} */ Shape.prototype.xval;
 /** @type {number} */ Shape.prototype.yval;
+/** @type {!Annotation} */ Shape.prototype.type;
 
 Shape.prototype.x = function(newv) 
 {
@@ -192,102 +186,28 @@ Shape.prototype.kind = function()
     throw new Error('must be reimplemented for subclass');
 };
 
-/**
- * find
- * get shape by id
- *
- * @param {!DataBaseObject.Key} id
- * @param {function(!Shape)} cb
- **/
-Shape.find = function(id, cb)
-{
-    if (id in Shape.all) {
-	    cb(Shape.all[id]);
-    } else {
-	    db.find(Shape, id, cb);
-    }
-};
-
-/**
- * insert
- * insert this one in the db.
- *
- * @param {function(!Shape)} cb
- **/
-Shape.prototype.insert = function(cb)
-{
-    if ('_id' in this) throw new Error('already in db');
-    var me = this;
-    db.insert(Shape, this, function(err) {
-	    if (err) throw new Error(err);
-	    Shape.all[me._id] = me;
-	    cb(me);
-    });
-};
-
 Shape.prototype.convertToDB = function()
 {
     var recd = {};
+    recd.kind = this.kind();
     recd.xval = this.xval;
     recd.yval = this.yval;
     recd.type = this.type.getKey();
-    recd.targets = {};
-    for (t in this.targets) {
-        recd.targets[t] = this.targets[t]._id;
-    }
     return recd;
 };
 
 Shape.kindToClass = [ null, Rectangle, NGon ];
 
-/**
- * convertFromDB
- * get source by id (implied get all the way back to root)
- * for this to work properly, root of tree needs to get preloaded
- *
- * @param {Object} recd
- * @param {function(!Shape)} cb
- **/
-Shape.convertFromDB = function(recd, cb)
+Shape.convertFromDB = function(recd)
 {
-    Annotation.find(recd.type, function(ann) {
-        Shape.kindToClass[recd.kind].convertFromDB(recd, ann, cb);
-    });
+    var cls = Shape.kindToClass[recd.kind];
+    return cls.convertFromDB(recd, Annotation.sfind(recd.type));
 };
 
-Shape.prototype.assignTarget = function(t, id, sync)
+Shape.prototype.renderSelected = function(cnv)
 {
-    var me = this;
-    Shape.find(id, function(s) {
-        me.targets[t] = s;
-    });
-};
-
-Shape.prototype.convertFromDB = function(recd, cb)
-{
-    var me = this;
-    me._id = recd._id;
-    var sync = undefined;       // for now
-    for (var t in recd.targets) {
-        me.assignTarget(t, sync);
-    }
-    cb(me);
-};
-
-Rectangle.convertFromDB = function(recd, ann, cb)
-{
-    var r = new Rectangle(recd.xval, recd.yval, recd.width, recd.height, ann);
-    r.convertFromDB(recd, cb);
-};
-
-NGon.convertFromDB = function(recd, ann, cb)
-{
-    var trace = [];
-    for (var i=0; i<recd.trace.length; i++) {
-        trace[i] = new Point(recd.trace[i].x, recd.trace[i].y);
-    }
-    var n = new NGon(trace, ann);
-    n.convertFromDB(recd, cb);
+    console.log('selected shape @ '+this.xval+","+this.yval);
+    this.renderWithAt(cnv.scratchpad, this.xval, this.yval, new Color(0, 155, 155, .5));
 };
 
 ////////////////////////////////////////////////////////////////
@@ -299,11 +219,6 @@ NGon.convertFromDB = function(recd, ann, cb)
  *
  * @constructor
  * @extends {Shape}
- * @param {number} x
- * @param {number} y
- * @param {number} w
- * @param {number} h
- * @param {!Annotation} type
  **/
 function Rectangle(x, y, w, h, type)
 {
@@ -312,6 +227,21 @@ function Rectangle(x, y, w, h, type)
     this.h = h;
 }
 Util.inherits(Rectangle, Shape);
+
+Rectangle.convertFromDB = function(recd, ann)
+{
+    return new Rectangle(recd.xval, recd.yval, recd.width, recd.height, ann);
+};
+
+Rectangle.prototype.convertToDB = function()
+{
+    var recd = Shape.prototype.convertToDB.call(this);
+    recd.xval = this.xval;
+    recd.yval = this.yval;
+    recd.width = this.width;
+    recd.height = this.height;
+    return recd;
+};
 
 Rectangle.prototype.kind = function()
 {
@@ -347,15 +277,23 @@ Rectangle.prototype.render = function(target)
  *
  * @constructor
  * @extends {Shape}
- * @param {Array.<!Point>} trace
- * @param {!Annotation} type
+ * @param {number} id
  **/
 function NGon(trace, type)
 {
     NGon.super_.call(this, type, trace[0].x(), trace[0].y());
     this.trace = trace;
-}
+};
 Util.inherits(NGon, Shape);
+
+NGon.convertFromDB = function(recd, ann)
+{
+    var trace = [];
+    for (var i=0; i<recd.trace.length; i++) {
+        trace[i] = new Point(recd.trace[i].x, recd.trace[i].y);
+    }
+    return new NGon(trace, ann);
+};
 
 NGon.prototype.kind = function()
 {
@@ -386,6 +324,13 @@ NGon.prototype.renderWithAt = function(target, offx, offy, color)
     ctx.stroke();
 };
 
+NGon.prototype.getCenterPoint = function()
+{
+    var ll = this.lowerleft();
+    var ur = this.upperright();
+    return new Point((ll.x()+ur.x())/2, (ll.y()+ur.y())/2);
+};
+
 /**
  * renderAt
  * render this shape at offx, offy
@@ -407,14 +352,18 @@ NGon.prototype.render = function(target)
 
 NGon.prototype.lowerleft = function()
 {
-    if ('ll' in this) return this.ll;
+    if ('ll' in this) {
+        console.log('old ll: '+this.trace[0].asString(1)+" -> "+this.ll.asString(1)+' '+this.trace.length);
+        return this.ll;
+    }
     var x = this.trace[0].x();
     var y = this.trace[0].y();
     for (var i=1; i<this.trace.length; i++) {
-	if (this.trace[i].x() < x) x = this.trace[i].x();
-	if (this.trace[i].y() > y) y = this.trace[i].y();
+	    if (this.trace[i].x() < x) x = this.trace[i].x();
+	    if (this.trace[i].y() > y) y = this.trace[i].y();
     }
     this.ll = new Point(x,y);
+    console.log('ll: '+this.trace[0].asString(1)+" -> "+this.ll.asString(1)+' '+this.trace.length);
     return this.ll;
 };
 
@@ -435,10 +384,10 @@ NGon.prototype.containsPoint = function(p)
 {
     // first test bounding box
     if (  (this.upperright().x() < p.x())
-	||(this.upperright().y() > p.y())
-	||(this.lowerleft().x() > p.x())
-	||(this.lowerleft().y() < p.y())) 
-	return false;
+	      ||(this.upperright().y() > p.y())
+	      ||(this.lowerleft().x() > p.x())
+	      ||(this.lowerleft().y() < p.y())) 
+	    return false;
     // now complex text (ray casting for fun)
 
     // choose epsilon to be big enough, but not too big
@@ -454,21 +403,113 @@ NGon.prototype.containsPoint = function(p)
     var sides = this.trace.length;
     //console.log('sides: '+sides);
     for (var side = 0; side < sides; side++) {
-	// Test if current side intersects with ray.
-	var start = side;
-	var end = side+1;
-	if (end >= sides) end = 0;
-	if (this.intersect(rayOrigin, p, start, end)) {
-	    intersections++;
-	    //console.log('Intersected! '+intersections);
-	}
+	    // Test if current side intersects with ray.
+	    var start = side;
+	    var end = side+1;
+	    if (end >= sides) end = 0;
+	    if (this.intersect(rayOrigin, p, start, end)) {
+	        intersections++;
+	        //console.log('Intersected! '+intersections);
+	    }
     }
     //console.log('Total intersections =  '+intersections);
     if ((intersections & 1) == 1) {
-	return true;
+	    return true;
     } 
     return false;
 };
+
+/**
+ * getIntersectionWithPerimeter
+ * return point of intersection between line pq and the side it intersects with on this ngon
+ * null if no intersection
+ *
+ * @private
+ * @param {Point} p
+ * @param {Point} q
+ * @return {Point}
+ **/
+NGon.prototype.getIntersectionWithPerimeter = function(p, q)
+{
+    var sides = this.trace.length;
+    //console.log('sides: '+sides);
+    for (var side = 0; side < sides; side++) {
+	    // Test if current side intersects with pq.
+	    var start = side;
+	    var end = side+1;
+	    if (end >= sides) end = 0;
+        if (this.intersect(p, q, start, end)) {
+            //#removeIfShip
+            if (0) {
+	            var cnv = Canvas.getLast();
+	            var ctx = cnv.getContext();
+	            ctx.beginPath();
+                var r = this.trace[start];
+                var s = this.trace[end];
+	            console.log('Checking ['+[p.asString(),q.asString()].join(",")+']  against ['+[r.asString(),s.asString()].join(",")+']');
+	            ctx.strokeStyle = "blue";
+	            ctx.lineWidth = 4;
+	            ctx.moveTo(p.x(), p.y());
+	            ctx.lineTo(q.x(),q.y());
+	            ctx.stroke();
+	            ctx.strokeStyle = "pink";
+	            ctx.moveTo(r.x(), r.y());
+	            ctx.lineTo(s.x(),s.y());
+	            ctx.stroke();
+	            ctx.closePath();
+            }
+            //#endremoveIfShip
+
+	        var ip = findIntersection(p, q, this.trace[start], this.trace[end]);
+            if (ip) {
+                return ip;
+	        }
+        }
+    }
+    return null;
+};
+
+/**
+ * findIntersection
+ * return point of intersection between pq and rs, null if none
+ *
+ * @param {!Point} p
+ * @param {!Point} q
+ * @param {!Point} r
+ * @param {!Point} s
+ * @return {Point}
+ **/
+function findIntersection(p, q, r, s)
+{
+    var a1, a2, b1, b2, c1, c2;
+
+    // Convert vector 1 to a line (line 1) of infinite length.
+    // We want the line in linear equation standard form: A*x + B*y + C = 0
+    // See: http://en.wikipedir.org/wiki/Linear_equation
+    a1 = q.y() - p.y();
+    b1 = p.x() - q.x();
+    c1 = (q.x() * p.y()) - (p.x() * q.y());
+
+    // We repeat everything above for vector 2.
+    // We start by calculating line 2 in linear equation standard form.
+    a2 = s.y() - r.y();
+    b2 = r.x() - s.x();
+    c2 = (s.x() * r.y()) - (r.x() * s.y());
+
+    var delta = a1*b2 - a2*b1;
+    if(delta == 0) {
+        console.log('lines are parallel');
+        return null;
+    }
+    var x = (b2*c1 - b1*c2)/delta;
+    var y = (a1*c2 - a2*c1)/delta;
+    if (x*y < 0) throw new Error('oppposite signs');
+    if (x < 0) {
+        x=x*-1;
+        y=y*-1;
+    }
+    return new Point(x, y);
+}
 
 NGon.prototype.intersect = function(p, q, i, j)
 {
@@ -543,12 +584,6 @@ NGon.prototype.intersect = function(p, q, i, j)
 
     // If they are not collinear, they must intersect in exactly one point.
     return true;
-};
-
-NGon.prototype.renderSelected = function(cnv)
-{
-    console.log('selected shape @ '+this.trace[0].asString());
-    this.renderWithAt(cnv.scratchpad, this.trace[0].x(), this.trace[0].y(), new Color(0, 155, 155, .5));
 };
 
 NGon.prototype.convertToDB = function()
