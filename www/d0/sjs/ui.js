@@ -12,6 +12,7 @@ function UI(canvas, page)
     this.page = page;
     $('#pagetitle').append(page.name.asString('long'));
     this.installHandlers();
+    this.clearSelection();
     this.changeMode(UI.Mode.Quiet);
 }
 
@@ -40,23 +41,24 @@ UI.prototype.changeMode = function(newmode)
     switch (newmode)
     {
     case UI.Mode.Quiet:
-	this.currentTools = UI.tools['main'];
-	break;
+	    this.currentTools = UI.tools['main'];
+	    break;
 
     case UI.Mode.MarkPassage:
-	this.currentTools = UI.tools['marking'];
-	break;
+	    this.currentTools = UI.tools['marking'];
+	    break;
 
     case UI.Mode.Selected:
-	this.currentTools = UI.tools['selected'];
-	break;
+	    this.currentTools = UI.tools['selected'];
+	    break;
 
     default:
-	alert('bad mode: '+newmode);
-	return;
+	    alert('bad mode: '+newmode);
+	    return;
     }
     this.mode = newmode;
     this.showTools();
+    this.showHelp('');
 };
 
 /**
@@ -70,20 +72,33 @@ UI.prototype.showTools = function()
     var $tools = $('#tools ul');
     $tools.empty();
     for (var label in this.currentTools) {
-	var tool = this.currentTools[label];
-	$tools.append('<li>'+tool.show+': '+tool.prompt+'</li>');
+	    var tool = this.currentTools[label];
+	    $tools.append('<li>'+tool.show+': '+tool.prompt+'</li>');
     }
 };
 
 UI.prototype.handleClick = function(evt, cnv)
 {
-    if (this.mode == UI.Mode.AddRect) {
-	this.page.addRect(cnv.mouseAt, 50, 50);
-    } else if (this.mode == UI.Mode.Quiet) {
-	// select the object under point
-	if (this.page.selectObjectAt(cnv.mouseAt)) {
-	    this.changeMode(UI.Mode.Selected);
-	}
+    switch (this.mode) {
+    case UI.Mode.AddRect:
+	    this.page.addRect(cnv.mouseAt, 50, 50);
+        break;
+
+    case UI.Mode.Quiet:
+	    // select the object under point
+	    if (this.page.selectObjectAt(cnv.mouseAt)) {
+	        this.changeMode(UI.Mode.Selected);
+	    }
+        break;
+
+    case UI.Mode.Selected:
+        if (this.page.selectObjectAt(cnv.mouseAt)) {
+            this.secondSelection();
+        } else {
+            this.clearSelection();
+	        this.changeMode(UI.Mode.Quiet);
+        }
+        break;
     }
 };
 
@@ -128,12 +143,12 @@ UI.prototype.startPassage = function(evt)
  * @param {!Event} evt
  **/
 UI.prototype.finishPassage = function(evt)
-{
-    if (this.mode == UI.Mode.MarkPassage) {
-	this.changeMode(UI.Mode.Quiet);
-	this.page.endPassage('unknown');
-    }
-};
+    {
+        if (this.mode == UI.Mode.MarkPassage) {
+	        this.changeMode(UI.Mode.Quiet);
+	        this.page.endPassage('unknown');
+        }
+    };
 
 /**
  * markPassageAs
@@ -149,6 +164,37 @@ UI.prototype.markPassageAs = function(kind, evt)
     this.page.endPassage(kind);
 };
 
+UI.prototype.clearSelection = function()
+{
+    this.startSelection = null;
+    this.direction = '';
+    this.page.clearSelection();
+};
+
+/**
+ * secondSelection
+ * an additional object has been selected while in selection mode
+ *
+ * @private
+ **/
+UI.prototype.secondSelection = function()
+{
+    switch (this.direction) {
+    case 'toref':
+        this.page.createReference(this.startSelection, this.page.getSelectedShape());
+        break;
+
+    case 'fromref':
+        this.page.createReference(this.page.getSelectedShape(), this.startSelection);
+        break;
+
+    default:
+        return;
+    }
+    this.clearSelection();
+    this.changeMode(UI.Mode.Quiet);
+};
+
 /**
  * create link to source
  * <desc>
@@ -159,6 +205,17 @@ UI.prototype.markPassageAs = function(kind, evt)
  **/
 UI.prototype.startReference = function(direction, evt)
 {
+    this.startSelection = this.page.getSelectedShape();
+    this.direction = direction;
+    if (direction == 'toref') this.showHelp('Click on reference');
+    else this.showHelp('Click on source of this reference');
+};
+
+UI.prototype.showHelp = function(msg)
+{
+    var $helparea = $('#help');
+    $helparea.empty();
+    $helparea.append('<span>'+msg+'</span>');
 };
 
 /**
@@ -259,21 +316,21 @@ UI.prototype.installHandlers = function()
 {
     var me = this;
     this.canvas.mouseListner('click', function(evt, cnv) {
-	me.handleClick(evt, cnv);
+	    me.handleClick(evt, cnv);
     });
     this.canvas.mouseListner('mousedown', function(evt, cnv) {
-	me.handleMouseDown(evt, cnv);
+	    me.handleMouseDown(evt, cnv);
 
     });
     this.canvas.mouseListner('mouseup', function(evt, cnv) {
-	me.handleMouseUp(evt, cnv);
+	    me.handleMouseUp(evt, cnv);
     });
     this.canvas.mouseListner('mousemove', function(evt, cnv) {
-	me.handleMouseMove(evt, cnv);
+	    me.handleMouseMove(evt, cnv);
     });
     // detect keys
     $('body').keydown(function(evt) {
-	me.handleKeydown(evt);
+	    me.handleKeydown(evt);
     });
 };
 
