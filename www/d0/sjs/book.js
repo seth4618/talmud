@@ -11,14 +11,21 @@ if (typeof window === 'undefined') {
  * @param {Source?} parent
  * @param {!string} name
  **/
-function Source(parent, name)
+function Source(id)
+{
+    if (id != undefined) this._id = id;
+    this.parent = null;
+    this.name = 'undefined';
+    this.child = null;
+    this.next = null
+    this.prev = null;
+}
+
+Source.prototype.init = function(parent, name)
 {
     console.log('Creating source '+name+' with parent of '+((parent == null)?'null':parent.name));
     this.parent = parent;
     this.name = name;
-    this.child = null;
-    this.next = null
-    this.prev = null;
     if (parent) {
 	parent.addChild(this);
     }
@@ -78,7 +85,8 @@ Source.init = function(cb)
 	console.log('recd from init = '+recd);
 	if (recd == null) {
 	    // nothing in store yet
-	    var root = new Source(null, 'library');
+	    var root = new Source();
+	    root.init(null, 'library');
 	    root.type = Source.Types.library;
 	    db.insert(Source, root, function(err) {
 		if (err) throw err;
@@ -104,11 +112,7 @@ Source.init = function(cb)
  **/
 Source.find = function(id, cb)
 {
-    if (id in Source.all) {
-	cb(Source.all[id]);
-    } else {
-	db.find(Source, id, cb);
-    }
+    db.find(Source, id, cb);
 };
 
 /**
@@ -205,7 +209,8 @@ Source.createFromPath = function(path, cb, idx)
     parent.findChildByName(path[idx], function(node) {
 	if (node == null) {
 	    // this child does not exist in db, so create it
-	    var s = new Source((/** @type {!Source} */ parent), (/** @type {!string} */ path[idx]));
+	    var s = new Source();
+	    s.init((/** @type {!Source} */ parent), (/** @type {!string} */ path[idx]));
 	    s.type = Source.createIdxToType[idx];
 	    if (/^[0-9]+/.test(path[idx])) {
 		// extract number from string
@@ -246,11 +251,10 @@ Source.prototype.convertToDB = function()
 Source.convertFromDB = function(recd, cb)
 {
     var fillin = function(parent, recd) {
-	s = new Source(parent, recd.name);
-	Source.all[recd._id] = s;
+	s = Source.all[recd._id];
+	s.init(parent, recd.name);
 	s.type = recd.type;
 	s.number = recd.number;
-	s._id = recd._id;
 	cb(s);
     };
 
@@ -349,7 +353,8 @@ Source.fakedata = function()
     var parent = null;
     for (var i=0; i<page.length; i++) {
 	var info = page[i];
-	var s = new Source(parent, info.name);
+	var s = new Source();
+	s.init(parent, info.name);
 	for (var key in info) {
 	    s[key] = info[key];
 	}
@@ -385,6 +390,7 @@ Source.prototype.addChild = function(newchild)
 };
 
 Util.addAsynchReadyHook(-50, function(cb) {
+    console.log('running book hook');
     Source.init(cb);
 });
 
