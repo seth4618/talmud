@@ -80,6 +80,7 @@ DB.prototype.addIndex = function(store, name, path, params)
  **/
 DB.prototype.upgrade = function(event)
 {
+    console.log('upgrading');
     // create all the stores we need
     var changes = 0;
     // delete some old one
@@ -135,6 +136,8 @@ DB.prototype.upgrade = function(event)
     if (changes == 0) throw new Error('upgrade caused on '+this.name+', but no changes made');
 };
 
+var xxx;
+
 /**
  * open
  * open the db.
@@ -159,6 +162,7 @@ DB.prototype.open = function(cb)
     }
     var me = this;
     var request = window.indexedDB.open(this.name, (/** @type {!string} */ this.version));
+    xxx = request;
     request.onupgradeneeded = function(event) {
         me.db = event.target.result;
         console.log('upgrading');
@@ -287,7 +291,8 @@ DB.prototype.find = function(cls, id, cb)
     if (id in cls.all) {
         cb(cls.all[id]);
         return;
-    }
+    } 
+    cls.all[id] = new cls(id);
     var sname = cls.table;
 	var trans = this.db.transaction([sname], DB.READ);
     trans.oncomplete = function(e) { console.log('read only transaction complete for '+sname) };
