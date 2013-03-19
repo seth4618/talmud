@@ -5,19 +5,31 @@ var t=[[0,0],[200,0],[200,10],[125,10],[125,100],[75,100],[75,10],[0,10],[0,0]];
  * The underlying page
  *
  * @constructor
+ * @param {number} id
+ **/
+function Page(id)
+{
+    if (id != undefined) this._id = id;
+    this.shapes = [];
+    this.selected = -1;
+    this.loaded = false;
+
+}
+
+/**
+ * Page
+ * The underlying page
+ *
  * @param {!string} path
  * @param {!Source} name
  * @param {function(!Page)=} onload
  **/
-function Page(path, name, onload)
+Page.prototype.init = function(path, name, onload)
 {
     this.path = path;
     this.name = name;
-    this.shapes = [];
-    this.selected = -1;
     this.offset = new Point(0,0);
     this.img = new Image();
-    this.loaded = false;
     this.lineHeightGuess = 25;
     onload = onload || function(x) {};
     var me = this;
@@ -118,9 +130,8 @@ Page.prototype.renderShape = function(s)
 
 Page.prototype.addRect = function(p, w, h)
 {
-    var r = new Rectangle(p.x(), p.y(), w, h, new Annotation('unknown'));
-    this.shapes.push(r);
-    this.renderShape(r);
+    this.addShape(new Rectangle(p.x(), p.y(), w, h, new Annotation('unknown')));
+    this.render(r);
 };
 
 Page.prototype.startPassage = function()
@@ -259,9 +270,11 @@ Page.prototype.endPassage = function(kind)
  **/
 Page.prototype.addShape = function(s)
 {
-    this.shapes.push(s);
+    var out = new Outline();
+    out.init(s);
+    this.shapes.push(out);
     var me = this;
-    s.insert(function() {
+    out.insert(function() {
         me.updateDB(function() {});
     });
     //db.add('onpage', {page: this.id, shape: s.id});
@@ -283,11 +296,11 @@ Page.prototype.guessPassage = function(passage, done, s, e)
     //console.log('gp: '+passage.points.length+(done?"":s.asString()+" & "+e.asString()));
     var points = [];
     for (var i=0; i<passage.points.length; i++) {
-	points.push(passage.points[i]);
+	    points.push(passage.points[i]);
     }
     if (!done) {
-	points.push(s);
-	points.push(e);
+	    points.push(s);
+	    points.push(e);
     }
 
     // for now three lines:
@@ -300,41 +313,70 @@ Page.prototype.guessPassage = function(passage, done, s, e)
     var upperright = points[0].copy();
     var str = [];
     for (var i=0; i<points.length; i++) {
-	var p = points[i];
-	str.push(p.asString(1));
-	if (p.x() > upperright.x()) upperright.x(p.x());
-	if (p.x() < lowerleft.x()) lowerleft.y(p.y());
-	if (p.y() < upperright.y()) upperright.y(p.y());
-	if (p.y() > lowerleft.y()) lowerleft.y(p.y());
+	    var p = points[i];
+	    str.push(p.asString(1));
+	    if (p.x() > upperright.x()) upperright.x(p.x());
+	    if (p.x() < lowerleft.x()) lowerleft.y(p.y());
+	    if (p.y() < upperright.y()) upperright.y(p.y());
+	    if (p.y() > lowerleft.y()) lowerleft.y(p.y());
     }
     if (points.length > 2 ) {
-	passage.lineheight = points[2].y()-upperright.y();
+	    passage.lineheight = points[2].y()-upperright.y();
     }
     var lineheight = passage.lineheight;
     //console.log(lineheight+" LL:"+lowerleft.asString(1)+" UR:"+upperright.asString(1)+" ["+str.join(", ")+"]");
     this.canvas.scratchpad.clear();
     if (points.length >= 2) {
-	// guess on first line height
-	var r = new Rectangle(lowerleft.x(), upperright.y(), points[0].x()-points[1].x(), lineheight, new Annotation('unknown'));
-	r.render(this.canvas.scratchpad)
+	    // guess on first line height
+	    var r = new Rectangle(lowerleft.x(), upperright.y(), points[0].x()-points[1].x(), lineheight, new Annotation('unknown'));
+	    r.render(this.canvas.scratchpad)
     }
     if (points.length >= 4) {
-	if (first && points[3].y()-points[2].y() > 50) {
-	    first = 0;
-	}
-	var r = new Rectangle(lowerleft.x(), points[2].y(), upperright.x()-lowerleft.x(), points[3].y()-points[2].y(), new Annotation('middle'));
-	r.render(this.canvas.scratchpad)
+	    if (first && points[3].y()-points[2].y() > 50) {
+	        first = 0;
+	    }
+	    var r = new Rectangle(lowerleft.x(), points[2].y(), upperright.x()-lowerleft.x(), points[3].y()-points[2].y(), new Annotation('middle'));
+	    r.render(this.canvas.scratchpad)
     }
     if (points.length == 6) {
-	var r = new Rectangle(points[5].x(), points[4].y()-lineheight, upperright.x()-points[5].x(), lineheight, new Annotation('unknown'));
-	r.render(this.canvas.scratchpad)
+	    var r = new Rectangle(points[5].x(), points[4].y()-lineheight, upperright.x()-points[5].x(), lineheight, new Annotation('unknown'));
+	    r.render(this.canvas.scratchpad)
     }
+};
+
+/**
+ * createReference
+ * crate a link between src and ref
+ *
+ * @param {!Shape} src
+ * @param {!Shape} ref
+ **/
+Page.prototype.createReference = function(src, ref)
+{
+    src.addRef(ref);
+    this.canvas.scratchpad.clear();
+    src.render(this.canvas);
+};
+
+Page.prototype.clearSelection = function()
+{
+    this.selected = -1;
+	this.canvas.scratchpad.clear();
+};
+
+Page.prototype.getSelectedShape = function()
+{
+    if (this.selected == -1) return null;
+    return this.shapes[this.selected];
 };
 
 // see if p is in an object
 Page.prototype.selectObjectAt = function(p)
 {
     for (var i=0; i<this.shapes.length; i++) {
+	    this.canvas.scratchpad.clear();
+	    this.shapes[i].renderSelected(this.canvas);
+
 	if (this.shapes[i].containsPoint(p)) {
 	    this.selected = i;
 	    this.canvas.scratchpad.clear();
@@ -354,11 +396,7 @@ Page.prototype.selectObjectAt = function(p)
  **/
 Page.find = function(id, cb)
 {
-    if (id in Page.all) {
-	    cb(Page.all[id]);
-    } else {
-	    db.find(Page, id, cb);
-    }
+	db.find(Page, id, cb);
 };
 
 Page.findBySource = function(src, cb)
@@ -394,7 +432,7 @@ Page.prototype.insert = function(cb)
  * updateDB
  * re-insert this one in the db.
  *
- * @param {function(!Page)} cb
+ * @param {function(!Page)=} cb
  **/
 Page.prototype.updateDB = function(cb)
 {
@@ -402,6 +440,7 @@ Page.prototype.updateDB = function(cb)
     var me = this;
     db.upsert(Page, this, function(err) {
 	    if (err) throw new Error(err);
+        if (cb == undefined) return;
 	    cb(me);
     });
 };
@@ -428,13 +467,14 @@ Page.prototype.convertToDB = function()
  **/
 Page.convertFromDB = function(recd, cb)
 {
+    var me = Page.all[recd._id];
     Source.find(recd.name, function(src) { 
-        var me = new Page(recd.path, src, function(p) {});
-        me._id = recd._id;
+        me.init(recd.path, src, function(p) {});
+        var sync = new Synchronizer(function() { cb(me); }, recd.shapes.length+1, "pageload");
         for (var i=0; i<recd.shapes.length; i++) {
-            Shape.find(recd.shapes[i], function(s) { me.shapes.push(s); });
+            Outline.find(recd.shapes[i], function(s) { me.shapes.push(s); sync.done(1); });
         }
-        cb(me);
+        sync.done(1);
     });
 };
 
@@ -463,11 +503,13 @@ var startpage;
 
 // hack for now
 Util.addAsynchReadyHook(1, function(cb) {
+    console.log('running cls hook');
     Source.find(6, function(s) {
         Page.findBySource(s, function(p) {
             if (p == null) {
                 // create it 
-                p = new Page("/images/yutorak.org-149a.gif", s, function() {});
+                p = new Page();
+                p.init("/images/yutorak.org-149a.gif", s, function() {});
                 p.insert(function(pp) { startpage = pp; cb(); });
             } else {
                 startpage = p;
@@ -477,22 +519,36 @@ Util.addAsynchReadyHook(1, function(cb) {
     });
 });
 
+var controller;
+
+function showpage(p)
+{
+    if (p.loaded) {
+        console.log('image is loaded');
+        var canvas = new Canvas("maincanvas");
+        canvas.addTemp();
+        p.setup(canvas);
+        p.render();
+        controller = new UI(canvas, p);
+    } else {
+        console.log('image not loaded yet');
+        setTimeout(function() { showpage(p); }, 200);
+    }
+}
+
 // this is last thing we run
 Util.addReadyHook(100, function() {
-    var canvas = new Canvas("maincanvas");
-    canvas.addTemp();
     var thispage;
     if (0) {
         var src = Source.fakedata();
         var path = "/page.jpg";
         path = "/images/yutorak.org-149a.gif";
-        thispage = new Page(path, src, function(p) { p.setup(canvas); p.render(); });
+        thispage = new Page();
+        thispage.init(path, src, function(p) { p.setup(canvas); p.render(); });
     } else {
         thispage = startpage;
-        thispage.setup(canvas);
-        thispage.render();
+        showpage(thispage);
     }
-    var controller = new UI(canvas, thispage);
 });
 
 
