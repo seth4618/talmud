@@ -73,12 +73,23 @@ Util.fatal = function(xargs)
 };
 
 /**
- * fatal
+ * error
  * an error occurred.  Do something smart
  *
  * @param {...*} xargs
  **/
 Util.error = function(xargs)
+{
+    console.log(xargs);
+};
+
+/**
+ * error
+ * an error occurred.  Do something smart
+ *
+ * @param {...*} xargs
+ **/
+Util.info = function(xargs)
 {
     console.log(xargs);
 };
@@ -182,6 +193,8 @@ Util.executeHooks = function()
         f();
     }
 };
+
+Util.getType = function(x) { if (x === undefined) return "undefined"; return x.constructor.name; }
 
 $(document).ready(function() 
 {
