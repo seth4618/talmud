@@ -80,9 +80,9 @@ Source.Format[Source.Types.page] =  {'long': [ 'name' ], 'short': [ 'name' ] };
  **/
 Source.init = function(cb)
 {
-    console.log('init started');
+    //console.log('init started');
     db.find(Source, 1, function(recd) {
-	console.log('recd from init = '+recd);
+	//console.log('recd from init = '+recd);
 	if (recd == null) {
 	    // nothing in store yet
 	    var root = new Source();
