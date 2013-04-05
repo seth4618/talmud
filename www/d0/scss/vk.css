@@ -1,4 +1,12 @@
-﻿#VKeyboard-keyboard	{
+﻿@font-face {
+    font-family: 'Ezra SIL SR';
+    src: url('/fonts/ezrasilsr-webfont.eot?#iefix') format('embedded-opentype'),
+    url('/fonts/ezrasilsr-webfont.woff') format('woff'), 
+    url('/fonts/ezrasilsr-webfont.ttf')  format('truetype'),
+    url('/fonts/ezrasilsr-webfont.svg#EzraSILSR') format('svg');
+}
+
+#VKeyboard-keyboard	{
     width:510px;
     line-height:16px;
     font-size:.8em;
