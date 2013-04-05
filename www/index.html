@@ -1,7 +1,14 @@
+<!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
+
   <link rel="stylesheet" type="text/css" href="/d0/scss/main.css"/>
+  <link rel="stylesheet" type="text/css" href="/d0/scss/vk.css"/>
   <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.8/jquery.min.js"></script>
+  <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.2/jquery-ui.min.js"></script>
+  <!--script type="text/javascript" src="/d0/js/jquery.min.js"></script>
+  <script type="text/javascript" src="/do/js/jquery-ui.min.js"></script-->
   <script type="text/javascript" src="/d0/sjs/util.js"></script>
   <script type="text/javascript" src="/d0/sjs/sync.js"></script>
   <script type="text/javascript" src="/d0/sjs/opendb.js"></script>
@@ -10,22 +17,28 @@
   <script type="text/javascript" src="/d0/sjs/point.js"></script>
   <script type="text/javascript" src="/d0/sjs/outline.js"></script>
   <script type="text/javascript" src="/d0/sjs/ann.js"></script>
+  <script type="text/javascript" src="/d0/sjs/vk.js"></script>
   <script type="text/javascript" src="/d0/sjs/ui.js"></script>
   <script type="text/javascript" src="/d0/sjs/canvas.js"></script>
   <script type="text/javascript" src="/d0/sjs/cls.js"></script>
 </head>
 <body>
-<div id="pagetitle">
-</div>
+<div id="pagetitle"></div>
 <div id="main">
 <div id="tools">
-<ul>
-</ul>
-<div id="help">
-</div>
+<ul></ul>
+<div id="help"></div>
 </div>
 <div id="pagecontainer">
  <canvas id="maincanvas" width="1000" height="1000">no canvas</canvas>
+<div id="textentry">
+<textarea id="editor" rows="10" cols="50"></textarea>
+<input type="button" name="submittext" value="done">
+<input type="button" name="canceltext" value="cancel">
+<input type="button" name="hebrewtext" value="עברית">
+<div id="keyboard"></div>
+</div>
+
 </div>
 </div>
 </body>
