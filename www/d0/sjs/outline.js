@@ -10,6 +10,7 @@ function Outline(id)
     if (id != undefined) this._id = id;
     this.targets = [];
     this.selected = false;
+    this.deleted = null;
 }
 
 /**
@@ -28,6 +29,7 @@ Outline.table = 'shape';
 /** @type {boolean} */ Outline.prototype.selected;
 /** @type {!Shape} */ Outline.prototype.container;
 /** @type {!Array.<!Outline>} */ Outline.prototype.targets;
+/** @type {Date} */ Outline.prototype.deleted;
 
 /**
  * find
@@ -53,11 +55,48 @@ Outline.convertFromDB = function(recd, cb)
 {
     s = Outline.all[recd._id];
     s.init(Shape.convertFromDB(recd.shape));
+    if ('deleted' in recd) {
+        s.deleted = recd.deleted;
+    };
+    if (s.deleted != null) {
+        // this shape has been deleted, so we can ignore its targets
+        cb(s);
+        return;
+    }
     var sync = new Synchronizer(function() {     cb(s); }, recd.targets.length+1, "Outlineload");
     for (var i=0; i<recd.targets.length; i++) {
-        s.assignTarget(i, recd.targets[i], sync);
+	    if (recd.targets[i] == undefined) {
+	        console.log('UNDEFINED TARGET for outline'+recd._id);
+	        sync.done(1);
+	    } else {
+            s.assignTarget(i, recd.targets[i], sync);
+	    }
+    }
+    if ('text' in recd) {
+	    s.text = recd.text;
+	    s.font = recd.font;
     }
     sync.done(1);
+};
+
+Outline.prototype.asString = function()
+{
+    var result = [ 'Outline:', 
+                   (('_id' in this) ? this._id : '?'),
+                   ':', 
+                   (this.deleted?'DELETED':''),
+                   (this.selected?'SELECTED':''),
+                   (this.container?this.container.asString():'undefined-container'), 
+                   ' -> ',
+                   this.targets.length,
+                 ];
+    if (this.targets.length > 0) {
+        result.push(':');
+        for (i=0; i<this.targets.length; i++) {
+            result.push((this.targets[i]._id)?this.targets[i]._id:'?');
+        }
+    }
+    return result.join('');
 };
 
 /**
@@ -71,9 +110,9 @@ Outline.prototype.insert = function(cb)
     if ('_id' in this) throw new Error('already in db');
     var me = this;
     db.insert(Outline, this, function(err) {
-	    if (err) throw new Error(err);
-	    Outline.all[me._id] = me;
-	    cb(me);
+	if (err) throw new Error(err);
+	Outline.all[me._id] = me;
+	cb(me);
     });
 };
 
@@ -102,7 +141,27 @@ Outline.prototype.convertToDB = function()
     for (var i=0; i<this.targets.length; i++) {
         recd.targets.push(this.targets[i]._id);
     }
+    if ('text' in this) {
+	    recd.text = this.text;
+	    recd.font = this.font;
+    }
+    if (('deleted' in this)&&(this.deleted != null)) {
+        recd.onpage = this.onpage;
+        recd.deleted = this.deleted;
+    }
     return recd;
+};
+
+/**
+ * deleteMe
+ * remote this shape from a page. mark as deleted in db
+ *
+ **/
+Outline.prototype.deleteMe = function(page)
+{
+    this.deleted = new Date();
+    this.onpage = page._id;
+    this.updateDB();
 };
 
 Outline.prototype.assignTarget = function(t, id, sync)
@@ -132,11 +191,12 @@ Outline.prototype.render = function(target)
     ctx.lineWidth = old+2;
     var center = this.container.getCenterPoint();
     for (var i=0; i<this.targets.length; i++) {
-	var targetContainer = this.targets[i].container;
+        if (this.targets[i].deleted != null) continue;
+	    var targetContainer = this.targets[i].container;
         var tc = targetContainer.getCenterPoint();
         var from = this.container.getIntersectionWithPerimeter(center, tc);
         var to = targetContainer.getIntersectionWithPerimeter(center, tc);
-        console.log('line from '+from.asString(1)+' -> '+to.asString(1));
+        //console.log('line from '+from.asString(1)+' -> '+to.asString(1));
         ctx.beginPath();
         ctx.moveTo(from.x(), from.y());
         ctx.lineTo(to.x(), to.y());
@@ -144,6 +204,7 @@ Outline.prototype.render = function(target)
         ctx.stroke();
     }
     ctx.lineWidth = old;
+    if (this.text) this.renderText(target);
 };
 
 Outline.prototype.renderSelected = function(target)
@@ -155,3 +216,131 @@ Outline.prototype.containsPoint = function(p)
 {
     return this.container.containsPoint(p);
 };
+
+Outline.prototype.setText = function(text, target, page)
+{
+    // first set the text and calculate the height
+    this.font = {family: "Arial, Helvetica, sans-serif", size: 10, color: "black"};
+    var textinfo = this.prepareText(target, text);
+    this.text = textinfo.text;
+    this.container.height(textinfo.height);
+    //console.log('lines='+this.text.length+', h='+textinfo.height);
+
+    // now adjust the position so it doesn't overlap with anything else on the page
+    if (page == undefined) return;
+    
+    var shapes = page.getShapes();
+    var len = shapes.length;
+    var i;
+    var here = this.container;
+    var oldy = here.y();
+    for (i=0; i<len; i++) {
+        var c = shapes[i].container;
+        var overlap = c.findOverlapOfBB(here);
+        if (overlap == 0) continue;
+        // we have some overlap - try moving in y direction if not too harsh
+        console.log('overlap between me and '+i+' of '+overlap);
+        var up = here.lowerleft().y()-c.upperright().y();
+        var down = c.lowerleft().y()-here.upperright().y();
+        if (up < down) {
+            here.y(here.y()-(up+3));
+        } else {
+            here.y(here.y()+(down+3));
+        }
+    }
+    // check to see if we succeeded.  If not, restore original y and move only in x direction.
+    for (i=0; i<len; i++) {
+        var c = shapes[i].container;
+        var overlap = c.findOverlapOfBB(here);
+        if (overlap == 0) continue;
+        // we STILL have some overlap - move in X direction
+        here.y(oldy);
+        break;
+    }
+    // see if we were ok
+    if (i < len) {
+        // we have to move in x direction
+        var factor = (here.x() < 0) ? -1 : 1;
+        var bad = true;
+        while (bad) {
+            bad = false;
+            for (i=0; i<len; i++) {
+                var c = shapes[i].container;
+                var overlap = c.findOverlapOfBB(here);
+                if (overlap == 0) continue;
+                // we STILL have some overlap - move in X direction
+                bad = true;
+                console.log('X overlap still exists with '+i+' of '+overlap);
+                if (factor > 0) {
+                    // move to the right
+                    here.x(here.x()+(3+c.upperright().x()-here.lowerleft().x()));
+                } else {
+                    here.x(here.x()-(3+here.upperright().x()-c.lowerleft().x()));
+                }
+            }
+        }
+    }
+    // ok, we are all good now
+};
+
+Outline.LineHeight = 1.5;
+Outline.Xborder = 10;
+Outline.Yborder = 6;
+
+Outline.prototype.prepareText = function(target, text)
+{
+    // return this
+    var lines = [];
+
+    // see how many lines it takes
+    var context = target.getContext();
+    context.font = this.font.size+'pt '+this.font.family;
+    context.fillStyle = this.font.color;
+    var maxWidth = this.container.width()-Outline.Xborder;
+    var lineHeight = this.font.size*Outline.LineHeight;
+    text = text.replace(/\s+$/g, '');
+    text = text.replace(/\s+\n+/gm, '\n');
+    var input = text.split('\n');
+    for (inline=0; inline<input.length; inline++) {
+	var words = input[inline].split(' ');
+	var line = '';
+	for(var n = 0; n < words.length; n++) {
+            var testLine = line + words[n] + ' ';
+            var metrics = context.measureText(testLine);
+            var testWidth = metrics.width;
+            if(testWidth > maxWidth) {
+		lines.push(line);
+		line = words[n] + ' ';
+            }
+            else {
+		line = testLine;
+            }
+	}
+	lines.push(line);
+	lines.push('');
+    }
+    lines.pop();
+    return {text: lines, height: 3*Outline.Yborder/2+lines.length*lineHeight-(input.length-1)*lineHeight/2};
+};
+
+Outline.prototype.renderText = function(target)
+{
+    var context = target.getContext();
+    context.font = this.font.size+'pt '+this.font.family;
+    context.fillStyle = this.font.color;
+    var text = this.text;
+    var lineHeight = this.font.size*Outline.LineHeight;
+    var x = this.container.x()+Outline.Xborder/2;
+    var y = this.container.y()+Outline.Yborder/2+lineHeight;
+    for(var n = 0; n < text.length; n++) {
+	if (text[n] == '') y-= lineHeight/2;
+        else context.fillText(text[n], x, y);
+        y += lineHeight;
+    }
+    //console.log('container: '+this.container.height()+'   delta='+(y-this.container.y())+' and lh = '+lineHeight);
+};
+
+// Local Variables:
+// tab-width: 4
+// indent-tabs-mode: nil
+// End:
