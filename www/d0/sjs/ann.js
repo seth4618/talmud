@@ -32,7 +32,8 @@ Annotation.all = {};
     mishna: new Color(0, 0xff, 0xff, .5),
     gemora: new Color(0x66, 0x99, 0xff, .5),
     tosefot: new Color(0x99, 0x00, 0xff, .5),
-    rashi: new Color(0xCC, 0x66, 0x99, .5)
+    rashi: new Color(0xCC, 0x66, 0x99, .5),
+    translation: new Color(0xF2, 0xF5, 0xA9, .3)
 };
 
 Annotation.find = function(id, cb)
@@ -71,6 +72,10 @@ Annotation.prototype.getColor = function()
     return this.color;
 };
 
+Annotation.prototype.asString = function()
+{
+    return [ '{', this.name, ':', this.color.asString(), '}' ].join('');
+};
 
 
 // Local Variables:
