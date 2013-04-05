@@ -199,11 +199,12 @@ DB.prototype.rawinsert = function(sname, recd, cb)
 {
     if (cb == undefined) cb=DB.nowait;
 	var trans = this.db.transaction([sname], DB.READ_WRITE);
-    trans.oncomplete = function(e) { console.log('readwrite transaction complete for '+sname) };
+    trans.oncomplete = function(e) { //console.log('readwrite transaction complete for '+sname) 
+    };
 	var store = trans.objectStore(sname);
     var req = store.add(recd);
     req.onsuccess = function(e) {
-        console.log('add complete with '+e.target.result);
+        //console.log('add complete with '+e.target.result);
         recd._id = e.target.result;
         cb(null, recd);
     };
@@ -221,11 +222,12 @@ DB.prototype.rawupsert = function(sname, recd, cb)
         return;
     }
 	var trans = this.db.transaction([sname], DB.READ_WRITE);
-    trans.oncomplete = function(e) { console.log('transaction complete for '+sname) };
+    trans.oncomplete = function(e) { //console.log('transaction complete for '+sname) 
+    };
 	var store = trans.objectStore(sname);
     var req = store.put(recd);
     req.onsuccess = function(e) {
-        console.log('put complete with '+e.target.result);
+        //console.log('put complete with '+e.target.result);
         cb(null, recd);
     };
     req.onerror = function(e) {
@@ -295,11 +297,12 @@ DB.prototype.find = function(cls, id, cb)
     cls.all[id] = new cls(id);
     var sname = cls.table;
 	var trans = this.db.transaction([sname], DB.READ);
-    trans.oncomplete = function(e) { console.log('read only transaction complete for '+sname) };
+    trans.oncomplete = function(e) { //console.log('read only transaction complete for '+sname) 
+    };
 	var store = trans.objectStore(sname);
     var req = store.get(id);
     req.onsuccess = function(e) {
-        console.log('get complete with '+e.target.result);
+        //console.log('get complete with '+e.target.result);
         if (e.target.result == undefined) cb(null); else cls.convertFromDB(e.target.result, cb);
     };
     req.onerror = function(e) {
@@ -321,21 +324,22 @@ DB.prototype.findBy = function(cls, iname, val, cb)
 {
     var sname = cls.table;
 	var trans = this.db.transaction([sname], DB.READ);
-    trans.oncomplete = function(e) { console.log('read only transaction complete for '+sname) };
+    trans.oncomplete = function(e) { //console.log('read only transaction complete for '+sname) 
+    };
 	var store = trans.objectStore(sname);
     var index = store.index(iname);
     if (index == null) throw new Error('no index with name '+iname);
     var cnt = 1;
     var me = this;
     var result = [];
-    console.log('findby '+iname+' val = '+val);
+    //console.log('findby '+iname+' val = '+val);
     index.openKeyCursor(IDBKeyRange.only(val)).onsuccess = function(event) {
         var cursor = event.target.result;
         if (cursor) {
             // cursor.key is a name, like "Bill", and cursor.value is the SSN.
             // No way to directly get the rest of the stored object.
             cnt++;
-            console.log('findby finding: '+cursor.primaryKey);
+            //console.log('findby finding: '+cursor.primaryKey);
             me.find(cls, cursor.primaryKey, function(obj) {
                 cnt--;
                 result.push(obj);
