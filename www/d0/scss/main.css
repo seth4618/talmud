@@ -1,10 +1,14 @@
 #maincanvas  { 
     cursor: crosshair;
     border: solid 1px;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    z-index: 4;
 }
 #main { position: relative;     }
 #pagecontainer { position: relative;     float: left;}
-#childCanvas { position: absolute; top: 1px; left: 1px; }
+#childCanvas { z-index: 4; position: absolute; top: 1px; left: 1px; }
 #tools {
     float: left;
     width: 150px;
@@ -20,9 +24,18 @@ span.label {
     text-align: right;
     padding-right: 3px;
     width:90px;
-};
+}
 span.center {
     display: inline-block;
     text-align: center;
     width:100%;
-};
+}
+#textentry {
+    z-index: 10;
+    position: absolute;
+    display:none;
+    background-color: red;
+    border: solid 1px black;
+    top: 1px;
+    left: 1px;
+}
