@@ -1,0 +1,91 @@
+﻿#VKeyboard-keyboard	{
+    width:510px;
+    line-height:16px;
+    font-size:.8em;
+}
+
+.VKeyboard-key,#VKeyboard-backspace,#VKeyboard-tab,#VKeyboard-k25,#VKeyboard-caps-lock,
+#VKeyboard-enter,#VKeyboard-left-shift,#VKeyboard-right-shift,#VKeyboard-space,
+#VKeyboard-left-ctrl,#VKeyboard-right-ctrl,#VKeyboard-left-alt,#VKeyboard-right-alt,
+#VKeyboard,#VKeyboard-escape,#VKeyboard-swap	{
+    float:left;
+    display:block;
+    margin:1px;
+    height:2.4em;
+    line-height:2.2em;
+    text-align:center;
+    color:gray;
+}
+
+.VKeyboard-key	{width:32px;
+}
+
+#VKeyboard-backspace	{width:60px;
+}
+
+#VKeyboard-tab	{width:49.6px;
+}
+
+#VKeyboard-k25	{width:42px;
+}
+
+#VKeyboard-caps-lock	{width:60.8px;
+}
+
+#VKeyboard-enter	{width:65px;
+}
+
+#VKeyboard-left-shift	{width:36.8px;
+}
+
+#VKeyboard-right-shift	{width:88px;
+}
+
+#VKeyboard-space	{width:196.8px;
+	text-align:center;
+}
+
+#VKeyboard-swap {
+    width:102px;
+}
+#VKeyboard-right-alt	{
+    width:49px;
+}
+
+#VKeyboard-left-ctrl,#VKeyboard-left-alt,#VKeyboard-escape	{width:48px;
+}
+
+.VKeyboard-label-reference	{color:gray;
+	font-size:.72em;
+	line-height:9.6px;
+	text-align:left;
+	cursor:default;
+}
+
+.VKeyboard-label-natural	{margin-top:-5px;
+			 font-family: "Ezra SIL SR";
+
+	color:blue;
+	font-size:1.2em;
+	line-height:16px;
+	text-align:center;
+	cursor:default;
+}
+
+.VKeyboard-label-shift	{margin-top:-5px;
+	color:purple;
+	font-size:1.2em;
+	line-height:16px;
+	text-align:center;
+	cursor:default;
+}
+
+#VKeyboard-k29 .VKeyboard-label-reference,#VKeyboard-k32 .VKeyboard-label-reference	{color:#000;
+}
+
+.VKeyboard-recessed span	{color:#3C0;
+}
+
+.VKeyboard-clear	{clear:both;
+}
+
