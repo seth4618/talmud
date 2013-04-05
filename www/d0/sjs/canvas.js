@@ -39,8 +39,8 @@ Canvas.prototype.addTemp = function()
 {
     var child = document.createElement('canvas');
     if (!child) {
-	alert('Error: I cannot create a new canvas element!');
-	return;
+	    alert('Error: I cannot create a new canvas element!');
+	    return;
     }
 
     child.id     = 'childCanvas';
@@ -53,10 +53,10 @@ Canvas.prototype.addTemp = function()
     var $tmp = $(child);
     var me = this;
     var up = function(evt) {
-	me.handleMouse(evt);
+	    me.handleMouse(evt);
     }
     for (var i=0; i<Canvas.Events.length; i++) {
-	$tmp.on(Canvas.Events[i], up);
+	    $tmp.on(Canvas.Events[i], up);
     }
     return kid;
 };
@@ -124,25 +124,25 @@ Canvas.prototype.reset = function()
 Canvas.prototype.mouseListner = function(type, cb)
 {
     if (this.listners == undefined) {
-	this.setupMouse();
+	    this.setupMouse();
     }
     if (type in this.listners)
-	this.listners[type].push(cb);
+	    this.listners[type].push(cb);
     else
-	alert('No listner of type:'+type);
+	    alert('No listner of type:'+type);
 };
 
 Canvas.prototype.setupMouse = function()
 {
     var me = this;
     var mouseHandler = function(evt) {
-	me.handleMouse(evt);
+	    me.handleMouse(evt);
     };
     this.listners = {};
     var $canvas = $(this.canvas);
     for (var i=0; i<Canvas.Events.length; i++) {
-	this.listners[Canvas.Events[i]] = [];
-	$canvas.on(Canvas.Events[i], mouseHandler);
+	    this.listners[Canvas.Events[i]] = [];
+	    $canvas.on(Canvas.Events[i], mouseHandler);
     }
 };
 
@@ -151,11 +151,11 @@ Canvas.prototype.handleMouse = function(evt)
     this.mouseAt = this.translateCoordinates(evt);
     //console.log(evt.type+' @ '+this.mouseAt.asString());
     if (evt.type in this.listners) {
-	var cbs = this.listners[evt.type];
-	for (var i=0; i<cbs.length; i++) {
-	    var cb = cbs[i];
-	    cb(evt, this);
-	}
+	    var cbs = this.listners[evt.type];
+	    for (var i=0; i<cbs.length; i++) {
+	        var cb = cbs[i];
+	        cb(evt, this);
+	    }
     }
 };
 
