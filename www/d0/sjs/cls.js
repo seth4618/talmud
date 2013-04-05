@@ -1,5 +1,7 @@
 var t=[[0,0],[200,0],[200,10],[125,10],[125,100],[75,100],[75,10],[0,10],[0,0]];
 
+var controller;
+
 /**
  * Page
  * The underlying page
@@ -45,7 +47,7 @@ Page.table = 'page';
 
 /** @type {!string} */ Page.prototype.path;
 /** @type {!Source} */ Page.prototype.name;
-/** @type {!Array.<!Shape>} */ Page.prototype.shapes;
+/** @type {!Array.<!Outline>} */ Page.prototype.shapes;
 /** @type {!Point} */ Page.prototype.offset;
 /** @type {!Point} */ Page.prototype.imageOffset;
 /** @type {!Point} */ Page.prototype.pageOffset;
@@ -74,7 +76,18 @@ Page.prototype.setup = function(canvas)
     var xoffset = (cw-w*s)/2;
     if (xoffset > 0)
 	canvas.pan(new Point(xoffset, 0));
-    this.pageOffset = new Point(0,0);
+    //NEED THIS? 3/19/13 this.pageOffset = new Point(0,0);
+};
+
+/**
+ * getShapes
+ * return the list of shapes associated with this page
+ *
+ * @return {!Array.<Outline>} 
+ **/
+Page.prototype.getShapes = function()
+{
+    return this.shapes;
 };
 
 Page.prototype.render = function()
@@ -87,7 +100,7 @@ Page.prototype.render = function()
     for (var i=0; i<this.shapes.length; i++) this.renderShape(this.shapes[i]);
     this.canvas.scratchpad.clear();
     if (this.selected != -1) {
-	this.shapes[this.selected].renderSelected(this.canvas);
+	    this.shapes[this.selected].renderSelected(this.canvas);
     }
 };
 
@@ -98,14 +111,31 @@ Page.prototype.reset = function(canvas)
     this.render();
 };
 
+Page.prototype.deleteShape = function(shape)
+{
+    if (shape == null) return;
+    var i;
+    for (i=0; i<this.shapes.length; i++) {
+        if (this.shapes[i] == shape) {
+            this.shapes.splice(i, 1);
+            break;
+        }
+    }
+    console.log('deleted element # '+i);
+    shape.deleteMe(this);
+    this.selected = -1;
+    this.updateDB();
+    this.render();
+};
+
 Page.prototype.showlots = function()
 {
     var canvas = this.canvas;
     var ctx = canvas.getContext();
     ctx.fillStyle =  (new Color(0, 100, 255, 1)).rgb();
     ctx.font = "24px sans-serif";
-    for (var x=-400; x<=400; x+=200) {
-	for (var y=-400; y<=400; y+= 200) {
+    for (var x=-400; x<=1400; x+=200) {
+	for (var y=-400; y<=1400; y+= 200) {
 	    ctx.fillStyle =  (new Color(255, 255, 255, 1)).rgb();
 	    ctx.fillRect(x,y-40,100,80);
 	    ctx.strokeStyle = (new Color(255,0,0,1)).rgb();
@@ -266,17 +296,26 @@ Page.prototype.endPassage = function(kind)
  * add a new annotatin to the page
  *
  * @private
- * @param {!Shape} s
+ * @param {!(Shape|Outline)} s
+ * @param {function(!Outline)=} cb
+ * @return {!Outline}
  **/
-Page.prototype.addShape = function(s)
+Page.prototype.addShape = function(s, cb)
 {
-    var out = new Outline();
-    out.init(s);
+    cb = cb || function() {};
+    var out;
+    if (s instanceof Shape) {
+        out = new Outline();
+        out.init(s);
+    } else {
+        out = s;
+    }
     this.shapes.push(out);
     var me = this;
     out.insert(function() {
-        me.updateDB(function() {});
+        me.updateDB(function() { cb(out); });
     });
+    return out;
     //db.add('onpage', {page: this.id, shape: s.id});
 };
 
@@ -364,6 +403,34 @@ Page.prototype.clearSelection = function()
 	this.canvas.scratchpad.clear();
 };
 
+Page.prototype.createNoteNearSelected = function(kind)
+{
+    if (this.selected == -1) return;
+    var s = this.shapes[this.selected];
+    var left = 0;
+    var right = this.img.naturalWidth;
+    var ld = s.container.lowerleft().x()-left;
+    var rd = right - s.container.upperright().x();
+    if (ld < rd) left = -200; else left = right;
+    controller.showEditor();
+    
+    this.nextnote = {src: s, x: left, y: s.container.upperright().y(), kind: kind};
+};
+
+Page.prototype.finishText = function(text)
+{
+    console.log(text.length+": "+text);
+    this.nextnote.text = text;
+    var out = new Outline();
+    out.init(new Rectangle(this.nextnote.x, this.nextnote.y, 200, 60, new Annotation(this.nextnote.kind)));
+    out.setText(text, this.canvas, this);
+    var me = this;
+    this.addShape(out, function(x) {
+        me.nextnote.src.addRef(out);
+        me.render();
+    });
+};
+
 Page.prototype.getSelectedShape = function()
 {
     if (this.selected == -1) return null;
@@ -373,16 +440,16 @@ Page.prototype.getSelectedShape = function()
 // see if p is in an object
 Page.prototype.selectObjectAt = function(p)
 {
-    for (var i=0; i<this.shapes.length; i++) {
+    for (var i=this.shapes.length-1; i>=0; i--) {
 	    this.canvas.scratchpad.clear();
-	    this.shapes[i].renderSelected(this.canvas);
+	    //this.shapes[i].renderSelected(this.canvas);
 
-	if (this.shapes[i].containsPoint(p)) {
-	    this.selected = i;
-	    this.canvas.scratchpad.clear();
-	    this.shapes[i].renderSelected(this.canvas);
-	    return true;
-	}
+	    if (this.shapes[i].containsPoint(p)) {
+	        this.selected = i;
+	        this.canvas.scratchpad.clear();
+	        this.shapes[i].renderSelected(this.canvas);
+	        return true;
+	    }
     }
     return false;
 };
@@ -472,7 +539,7 @@ Page.convertFromDB = function(recd, cb)
         me.init(recd.path, src, function(p) {});
         var sync = new Synchronizer(function() { cb(me); }, recd.shapes.length+1, "pageload");
         for (var i=0; i<recd.shapes.length; i++) {
-            Outline.find(recd.shapes[i], function(s) { me.shapes.push(s); sync.done(1); });
+            Outline.find(recd.shapes[i], function(s) { me.shapes.push(s); console.log('page loaded shape: '+s.asString()); sync.done(1); });
         }
         sync.done(1);
     });
@@ -519,12 +586,10 @@ Util.addAsynchReadyHook(1, function(cb) {
     });
 });
 
-var controller;
-
 function showpage(p)
 {
     if (p.loaded) {
-        console.log('image is loaded');
+        //console.log('image is loaded');
         var canvas = new Canvas("maincanvas");
         canvas.addTemp();
         p.setup(canvas);
@@ -542,8 +607,8 @@ Util.addReadyHook(100, function() {
     if (0) {
         var src = Source.fakedata();
         var path = "/page.jpg";
-        path = "/images/yutorak.org-149a.gif";
-        thispage = new Page();
+        path = "/images/yutorak.org-149a.gif"; 
+       thispage = new Page();
         thispage.init(path, src, function(p) { p.setup(canvas); p.render(); });
     } else {
         thispage = startpage;
