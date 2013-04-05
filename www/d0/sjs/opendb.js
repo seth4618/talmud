@@ -4,7 +4,7 @@ var db;
 
 function opendb(cb)
 {
-    var ndb = new DB('talmud', 12);
+    var ndb = new DB('talmud', 13);
     ndb.addStoreDefinition('source', {keyPath: '_id', autoIncrement: true});
     ndb.addIndex('source', 'name', 'name', {});
     ndb.addIndex('source', 'parent', 'parent', {});
