@@ -150,6 +150,12 @@ Color.prototype.rgba = function(a)
     return "rgba("+ [ this.r, this.g, this.b, a].join(",") + ")";
 };
 
+
+Color.prototype.asString = function()
+{
+    return this.rgba();
+};
+
 /**
  * Shape
  * A shape
@@ -161,7 +167,7 @@ Color.prototype.rgba = function(a)
  **/
 function Shape(type, x, y)
 {
-    console.log('Creating '+x+','+y);
+    //console.log('Creating '+x+','+y);
     this.type = type;
     this.xval = x;
     this.yval = y;
@@ -173,17 +179,28 @@ function Shape(type, x, y)
 
 Shape.prototype.x = function(newv) 
 {
-    return this.xval;
+    if (newv == undefined) return this.xval;
+    this.xval = newv;
+    if ('ll' in this) delete this.ll;
+    if ('ur' in this) delete this.ur;
 };
 
 Shape.prototype.y = function(newv) 
 {
-    return this.yval;
+    if (newv == undefined) return this.yval;
+    this.yval = newv;
+    if ('ll' in this) delete this.ll;
+    if ('ur' in this) delete this.ur;
 };
 
 Shape.prototype.kind = function()
 {
     throw new Error('must be reimplemented for subclass');
+};
+
+Shape.prototype.asString = function()
+{
+    return [ Util.getType(this), "@" , (new Point(this.xval, this.yval)).asString(2) ].join(' ');
 };
 
 Shape.prototype.convertToDB = function()
@@ -206,8 +223,165 @@ Shape.convertFromDB = function(recd)
 
 Shape.prototype.renderSelected = function(cnv)
 {
-    console.log('selected shape @ '+this.xval+","+this.yval);
+    //console.log('selected shape @ '+this.xval+","+this.yval);
     this.renderWithAt(cnv.scratchpad, this.xval, this.yval, new Color(0, 155, 155, .5));
+};
+
+/**
+ * renderAt
+ * render this shape at offx, offy
+ *
+ * @param {!Canvas} target
+ * @param {number} offx
+ * @param {number} offy
+ **/
+Shape.prototype.renderAt = function(target, offx, offy)
+{
+    var color = this.type.getColor();
+    this.renderWithAt(target, offx, offy, color);
+};
+
+Shape.prototype.getCenterPoint = function()
+{
+    var ll = this.lowerleft();
+    var ur = this.upperright();
+    return new Point((ll.x()+ur.x())/2, (ll.y()+ur.y())/2);
+};
+
+/**
+ * intersect
+ * return true if line pq intersects with line rs
+ *
+ * @param {!Point} p
+ * @param {!Point} q
+ * @param {!Point} r
+ * @param {!Point} s
+ * @return {boolean}
+ **/
+if (0) {
+Shape.prototype.intersect = function(p, q, r, s)
+{
+    //#removeIfShip
+    if (0) {
+	    var cnv = Canvas.getLast();
+	    var ctx = cnv.getContext();
+	    ctx.beginPath();
+	    console.log('Checking ['+[p.asString(),q.asString()].join(",")+']  against ['+[r.asString(),s.asString()].join(",")+']');
+	    ctx.strokeStyle = "blue";
+	    ctx.lineWidth = 4;
+	    ctx.moveTo(p.x(), p.y());
+	    ctx.lineTo(q.x(),q.y());
+	    ctx.stroke();
+	    ctx.strokeStyle = "pink";
+	    ctx.moveTo(r.x(), r.y());
+	    ctx.lineTo(s.x(),s.y());
+	    ctx.stroke();
+	    ctx.closePath();
+    }
+    //#endremoveIfShip
+
+    var d1, d2;
+    var a1, a2, b1, b2, c1, c2;
+
+    // Convert vector 1 to a line (line 1) of infinite length.
+    // We want the line in linear equation standard form: A*x + B*y + C = 0
+    // See: http://en.wikipedir.org/wiki/Linear_equation
+    if (0) {
+    a1 = q.y() - p.y();
+    b1 = p.x() - q.x();
+    c1 = (q.x() * p.y()) - (p.x() * q.y());
+    } else {
+        var dx = q.x()-p.x();
+        var dy = q.y()-p.y();
+        a1 = dx;
+        b1 = -dy;
+        c1 = p.y()*dy-p.x()*dx;
+    }
+    // Every point (x,y), that solves the equation above, is on the line,
+    // every point that does not solve it, is either above or below the line.
+    // We insert (x1,y1) and (x2,y2) of vector 2 into the equation above.
+    d1 = (a1 * r.x()) + (b1 * r.y()) + c1;
+    d2 = (a1 * s.x()) + (b1 * s.y()) + c1;
+
+    // If d1 and d2 both have the same sign, they are both on the same side of
+    // our line 1 and in that case no intersection is possible. Careful, 0 is
+    // a special case, that's why we don't test ">=" and "<=", but "<" and ">".
+    if (d1 > 0 && d2 > 0) return false;
+    if (d1 < 0 && d2 < 0) return false;
+
+    // We repeat everything above for vector 2.
+    // We start by calculating line 2 in linear equation standard form.
+    if (0) {
+    a2 = s.y() - r.y();
+    b2 = r.x() - s.x();
+    c2 = (s.x() * r.y()) - (r.x() * s.y());
+    } else {
+        var dx = s.x()-r.x();
+        var dy = s.y()-r.y();
+        a2 = dx;
+        b2 = -dy;
+        c2 = r.y()*dy-r.x()*dx;
+    }
+    
+    // Calulate d1 and d2 again, this time using points of vector 1
+    d1 = (a2 * p.x()) + (b2 * p.y()) + c2;
+    d2 = (a2 * q.x()) + (b2 * q.y()) + c2;
+
+    // Again, if both have the same sign (and neither one is 0),
+    // no intersection is possible.
+    if (d1 > 0 && d2 > 0) return false;
+    if (d1 < 0 && d2 < 0) return false;
+
+    // If we get here, only three possibilities are left. Either the two
+    // vectors intersect in exactly one point or they are collinear
+    // (they both lie both on the same infinite line), in which case they
+    // may intersect in an infinite number of points or not at all.
+    if ((a1 * b2) - (a2 * b1) == 0.0) {
+	    console.log('CO-LINEAR');
+	    return false;		// THIS IS ACTUALLY COLINEAR.  NOT SURE IF WE SHOULD COUNT IT OR NOT.  I THINK IT IS UNLIKELY GIVEN MY DEF OF rayOrigin
+    }
+
+    // If they are not collinear, they must intersect in exactly one point.
+    return true;
+};
+}
+
+Shape.prototype.intersect = function(p0, p1, p2, p3, getpoint)
+{
+    var s1_x = p1.x() - p0.x();     
+    var s1_y = p1.y() - p0.y();
+    var s2_x = p3.x() - p2.x();
+    var s2_y = p3.y() - p2.y();
+
+    var s = (-s1_y * (p0.x() - p2.x()) + s1_x * (p0.y() - p2.y())) / (-s2_x * s1_y + s1_x * s2_y);
+    var t = ( s2_x * (p0.y() - p2.y()) - s2_y * (p0.x() - p2.x())) / (-s2_x * s1_y + s1_x * s2_y);
+
+    if (s >= 0 && s <= 1 && t >= 0 && t <= 1)
+    {
+        if (getpoint) {
+            // Collision detected
+            return new Point(p0.x() + (t * s1_x), p0.y() + (t * s1_y));
+        }
+        return true;
+    }
+    return false; // No collision
+};
+
+Shape.prototype.findOverlapOfBB = function(other)
+{
+    var x11 = this.lowerleft().x();
+    var y11 = this.upperright().y();
+    var x12 = this.upperright().x();
+    var y12 = this.lowerleft().y();
+
+    var x21 = other.lowerleft().x();
+    var y21 = other.upperright().y();
+    var x22 = other.upperright().x();
+    var y22 = other.lowerleft().y();
+
+    var xOverlap = Math.max(0, Math.min(x12,x22) - Math.max(x11,x21));
+    var yOverlap = Math.max(0, Math.min(y12,y22) - Math.max(y11,y21));
+    return xOverlap*yOverlap;
 };
 
 ////////////////////////////////////////////////////////////////
@@ -230,7 +404,9 @@ Util.inherits(Rectangle, Shape);
 
 Rectangle.convertFromDB = function(recd, ann)
 {
-    return new Rectangle(recd.xval, recd.yval, recd.width, recd.height, ann);
+    if (!('w' in recd)) recd.w = 200;
+    if (!('h' in recd)) recd.h = 100;
+    return new Rectangle(recd.xval, recd.yval, recd.w, recd.h, ann);
 };
 
 Rectangle.prototype.convertToDB = function()
@@ -238,8 +414,8 @@ Rectangle.prototype.convertToDB = function()
     var recd = Shape.prototype.convertToDB.call(this);
     recd.xval = this.xval;
     recd.yval = this.yval;
-    recd.width = this.width;
-    recd.height = this.height;
+    recd.w = this.w;
+    recd.h = this.h;
     return recd;
 };
 
@@ -249,16 +425,17 @@ Rectangle.prototype.kind = function()
 };
 
 /**
- * renderAt
+ * renderWithAt
  * render this shape at offx, offy
  *
  * @param {!Canvas} target
  * @param {number} offx
  * @param {number} offy
+ * @param {!Color} color
  **/
-Rectangle.prototype.renderAt = function(target, offx, offy)
+Rectangle.prototype.renderWithAt = function(target, offx, offy, color)
 {
-    var color = this.type.getColor();
+    //console.log('rect: '+offx+","+offy+"  for:"+this.w+"x"+this.h+"using "+color.rgb());
     var ctx = target.getContext();
     ctx.strokeStyle = color.rgb();
     ctx.fillStyle = color.rgba();
@@ -269,6 +446,100 @@ Rectangle.prototype.renderAt = function(target, offx, offy)
 Rectangle.prototype.render = function(target)
 {
     this.renderAt(target, this.xval, this.yval);
+};
+
+Rectangle.prototype.width = function(neww)
+{
+    if (neww == undefined) return this.w;
+    this.w = neww;
+    return neww;
+};
+
+Rectangle.prototype.height = function(newh)
+{
+    if (newh == undefined) return this.h;
+    this.h = newh;
+    return newh;
+};
+
+Rectangle.prototype.lowerleft = function()
+{
+    if ('ll' in this) {
+        return this.ll;
+    }
+    this.ll = new Point(this.xval,this.yval+this.h);
+    return this.ll;
+};
+
+Rectangle.prototype.upperright = function()
+{
+    if ('ur' in this) return this.ur;
+    this.ur = new Point(this.xval+this.w,this.yval);
+    return this.ur;
+};
+
+Rectangle.prototype.containsPoint = function(p)
+{
+    if (  (this.upperright().x() < p.x())
+	      ||(this.upperright().y() > p.y())
+	      ||(this.lowerleft().x() > p.x())
+	      ||(this.lowerleft().y() < p.y())) 
+	    return false;
+    return true;
+};
+
+/**
+ * getIntersectionWithPerimeter
+ * return point of intersection between line pq and the side it intersects with on this rectangle
+ * null if no intersection
+ *
+ * @private
+ * @param {Point} p
+ * @param {Point} q
+ * @return {Point}
+ **/
+Rectangle.prototype.getIntersectionWithPerimeter = function(p, q)
+{
+    var sides = 4;
+    var ll = this.lowerleft();
+    var ur = this.upperright();
+    var points = [ ll, new Point(ll.x(), ur.y()), ur, new Point(ur.x(), ll.y()) ];
+    //console.log('sides: '+sides);
+    for (var side = 0; side < sides; side++) {
+	    // Test if current side intersects with pq.
+	    var start = side;
+	    var end = side+1;
+	    if (end >= sides) end = 0;
+        if (this.intersect(p, q, points[start], points[end])) {
+            //#removeIfShip
+            if (0) {
+	            var cnv = Canvas.getLast();
+	            var ctx = cnv.getContext();
+	            ctx.beginPath();
+                var r = points[start];
+                var s = points[end];
+	            console.log('Checking ['+[p.asString(),q.asString()].join(",")+']  against ['+[r.asString(),s.asString()].join(",")+']');
+	            ctx.strokeStyle = "blue";
+	            ctx.lineWidth = 4;
+	            ctx.moveTo(p.x(), p.y());
+	            ctx.lineTo(q.x(),q.y());
+	            ctx.stroke();
+	            ctx.strokeStyle = "pink";
+	            ctx.moveTo(r.x(), r.y());
+	            ctx.lineTo(s.x(),s.y());
+	            ctx.stroke();
+	            ctx.closePath();
+            }
+            //#endremoveIfShip
+
+	        //var ip = findIntersection(p, q, points[start], points[end]);
+            var ip = this.intersect(p, q, points[start], points[end], true);
+            if (ip) {
+                return ip;
+	        }
+        }
+    }
+    return null;
 };
 
 /**
@@ -300,6 +571,15 @@ NGon.prototype.kind = function()
     return 2;
 };
 
+/**
+ * renderWithAt
+ * render this shape at offx, offy
+ *
+ * @param {!Canvas} target
+ * @param {number} offx
+ * @param {number} offy
+ * @param {!Color} color
+ **/
 NGon.prototype.renderWithAt = function(target, offx, offy, color)
 {
     var ctx = target.getContext();
@@ -324,36 +604,27 @@ NGon.prototype.renderWithAt = function(target, offx, offy, color)
     ctx.stroke();
 };
 
-NGon.prototype.getCenterPoint = function()
-{
-    var ll = this.lowerleft();
-    var ur = this.upperright();
-    return new Point((ll.x()+ur.x())/2, (ll.y()+ur.y())/2);
-};
-
-/**
- * renderAt
- * render this shape at offx, offy
- *
- * @param {!Canvas} target
- * @param {number} offx
- * @param {number} offy
- **/
-NGon.prototype.renderAt = function(target, offx, offy)
-{
-    var color = this.type.getColor();
-    this.renderWithAt(target, offx, offy, color);
-};
-
 NGon.prototype.render = function(target)
 {
     this.renderAt(target, this.trace[0].x(), this.trace[0].y());
 };
 
+NGon.prototype.width = function(neww)
+{
+    if (neww == undefined) return this.upperright().x()-this.lowerleft().x();
+    throw new Error("Can't set width of ngon");
+};
+
+NGon.prototype.height = function(newh)
+{
+    if (newh == undefined) return this.lowerleft().y()-this.upperright().y();
+    throw new Error("Can't set height of ngon");
+};
+
 NGon.prototype.lowerleft = function()
 {
     if ('ll' in this) {
-        console.log('old ll: '+this.trace[0].asString(1)+" -> "+this.ll.asString(1)+' '+this.trace.length);
+        //console.log('old ll: '+this.trace[0].asString(1)+" -> "+this.ll.asString(1)+' '+this.trace.length);
         return this.ll;
     }
     var x = this.trace[0].x();
@@ -363,7 +634,7 @@ NGon.prototype.lowerleft = function()
 	    if (this.trace[i].y() > y) y = this.trace[i].y();
     }
     this.ll = new Point(x,y);
-    console.log('ll: '+this.trace[0].asString(1)+" -> "+this.ll.asString(1)+' '+this.trace.length);
+    //console.log('ll: '+this.trace[0].asString(1)+" -> "+this.ll.asString(1)+' '+this.trace.length);
     return this.ll;
 };
 
@@ -391,7 +662,7 @@ NGon.prototype.containsPoint = function(p)
     // now complex text (ray casting for fun)
 
     // choose epsilon to be big enough, but not too big
-    var e = (this.upperright().x() - this.lowerleft().x())/100;
+    var e = (this.upperright().x() - this.lowerleft().x())/50;
     // choose a starting point DEFINITELY outside the NGon
     var rayOrigin = this.lowerleft().copy();
     rayOrigin.x(rayOrigin.x()-e);
@@ -460,7 +731,8 @@ NGon.prototype.getIntersectionWithPerimeter = function(p, q)
             }
             //#endremoveIfShip
 
-	        var ip = findIntersection(p, q, this.trace[start], this.trace[end]);
+	        //var ip = findIntersection(p, q, this.trace[start], this.trace[end]);
+            ip = this.intersect(p, q, start, end, true)
             if (ip) {
                 return ip;
 	        }
@@ -481,20 +753,37 @@ NGon.prototype.getIntersectionWithPerimeter = function(p, q)
  **/
 function findIntersection(p, q, r, s)
 {
+    throw new Error("don't call this anymore");
     var a1, a2, b1, b2, c1, c2;
 
     // Convert vector 1 to a line (line 1) of infinite length.
     // We want the line in linear equation standard form: A*x + B*y + C = 0
     // See: http://en.wikipedir.org/wiki/Linear_equation
+    if (0) {
     a1 = q.y() - p.y();
     b1 = p.x() - q.x();
     c1 = (q.x() * p.y()) - (p.x() * q.y());
+    } else {
+        var dx = q.x()-p.x();
+        var dy = q.y()-p.y();
+        a1 = dx;
+        b1 = -dy;
+        c1 = p.y()*dy-p.x()*dx;
+    }
 
     // We repeat everything above for vector 2.
     // We start by calculating line 2 in linear equation standard form.
+    if (0) {
     a2 = s.y() - r.y();
     b2 = r.x() - s.x();
     c2 = (s.x() * r.y()) - (r.x() * s.y());
+    } else {
+        var dx = s.x()-r.x();
+        var dy = s.y()-r.y();
+        a2 = dx;
+        b2 = -dy;
+        c2 = r.y()*dy-r.x()*dx;
+    }
 
     var delta = a1*b2 - a2*b1;
     if(delta == 0) {
@@ -504,86 +793,19 @@ function findIntersection(p, q, r, s)
     var x = (b2*c1 - b1*c2)/delta;
     var y = (a1*c2 - a2*c1)/delta;
     if (x*y < 0) throw new Error('oppposite signs');
-    if (x < 0) {
+    if ((x < 0)||(y < 0)) {
         x=x*-1;
         y=y*-1;
     }
     return new Point(x, y);
 }
 
-NGon.prototype.intersect = function(p, q, i, j)
+NGon.prototype.intersect = function(p, q, i, j, getpoint)
 {
     var r = this.trace[i];
     var s = this.trace[j];
-    // does pq intersect ab?
-
-    //#removeIfShip
-    if (0) {
-	var cnv = Canvas.getLast();
-	var ctx = cnv.getContext();
-	ctx.beginPath();
-	console.log('Checking ['+[p.asString(),q.asString()].join(",")+']  against ['+[r.asString(),s.asString()].join(",")+']');
-	ctx.strokeStyle = "blue";
-	ctx.lineWidth = 4;
-	ctx.moveTo(p.x(), p.y());
-	ctx.lineTo(q.x(),q.y());
-	ctx.stroke();
-	ctx.strokeStyle = "pink";
-	ctx.moveTo(r.x(), r.y());
-	ctx.lineTo(s.x(),s.y());
-	ctx.stroke();
-	ctx.closePath();
-    }
-    //#endremoveIfShip
-
-    var d1, d2;
-    var a1, a2, b1, b2, c1, c2;
-
-    // Convert vector 1 to a line (line 1) of infinite length.
-    // We want the line in linear equation standard form: A*x + B*y + C = 0
-    // See: http://en.wikipedir.org/wiki/Linear_equation
-    a1 = q.y() - p.y();
-    b1 = p.x() - q.x();
-    c1 = (q.x() * p.y()) - (p.x() * q.y());
-
-    // Every point (x,y), that solves the equation above, is on the line,
-    // every point that does not solve it, is either above or below the line.
-    // We insert (x1,y1) and (x2,y2) of vector 2 into the equation above.
-    d1 = (a1 * r.x()) + (b1 * r.y()) + c1;
-    d2 = (a1 * s.x()) + (b1 * s.y()) + c1;
-
-    // If d1 and d2 both have the same sign, they are both on the same side of
-    // our line 1 and in that case no intersection is possible. Careful, 0 is
-    // a special case, that's why we don't test ">=" and "<=", but "<" and ">".
-    if (d1 > 0 && d2 > 0) return false;
-    if (d1 < 0 && d2 < 0) return false;
-
-    // We repeat everything above for vector 2.
-    // We start by calculating line 2 in linear equation standard form.
-    a2 = s.y() - r.y();
-    b2 = r.x() - s.x();
-    c2 = (s.x() * r.y()) - (r.x() * s.y());
-
-    // Calulate d1 and d2 again, this time using points of vector 1
-    d1 = (a2 * p.x()) + (b2 * p.y()) + c2;
-    d2 = (a2 * q.x()) + (b2 * q.y()) + c2;
-
-    // Again, if both have the same sign (and neither one is 0),
-    // no intersection is possible.
-    if (d1 > 0 && d2 > 0) return false;
-    if (d1 < 0 && d2 < 0) return false;
-
-    // If we get here, only three possibilities are left. Either the two
-    // vectors intersect in exactly one point or they are collinear
-    // (they both lie both on the same infinite line), in which case they
-    // may intersect in an infinite number of points or not at all.
-    if ((a1 * b2) - (a2 * b1) == 0.0) {
-	console.log('CO-LINEAR');
-	return false;		// THIS IS ACTUALLY COLINEAR.  NOT SURE IF WE SHOULD COUNT IT OR NOT.  I THINK IT IS UNLIKELY GIVEN MY DEF OF rayOrigin
-    }
-
-    // If they are not collinear, they must intersect in exactly one point.
-    return true;
+    // does pq intersect rs?
+    return Shape.prototype.intersect.call(this, p, q, r, s, getpoint);
 };
 
 NGon.prototype.convertToDB = function()
