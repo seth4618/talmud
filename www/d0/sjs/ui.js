@@ -11,6 +11,8 @@ function UI(canvas, page)
     this.canvas = canvas;
     this.page = page;
     $('#pagetitle').append(page.name.asString('long'));
+    $("body").attr("lang", "en");
+    this.keyboard = VKeyboard.loadHebrew("keyboard", "editor");
     this.installHandlers();
     this.clearSelection();
     this.changeMode(UI.Mode.Quiet);
@@ -79,7 +81,8 @@ UI.prototype.showTools = function()
 
 UI.prototype.handleClick = function(evt, cnv)
 {
-    switch (this.mode) {
+    console.log(cnv.mouseAt.asString());
+     switch (this.mode) {
     case UI.Mode.AddRect:
 	    this.page.addRect(cnv.mouseAt, 50, 50);
         break;
@@ -195,6 +198,13 @@ UI.prototype.secondSelection = function()
     this.changeMode(UI.Mode.Quiet);
 };
 
+UI.prototype.deleteIt = function(evt)
+{
+    this.page.deleteShape(this.page.getSelectedShape());
+    this.clearSelection();
+    this.changeMode(UI.Mode.Quiet);
+};
+
 /**
  * create link to source
  * <desc>
@@ -228,6 +238,7 @@ UI.prototype.showHelp = function(msg)
  **/
 UI.prototype.startNote = function(kind, evt)
 {
+    this.page.createNoteNearSelected(kind);
 };
 
 /**
@@ -246,71 +257,79 @@ UI.prototype.resetMode = function(evt)
 
 UI.prototype.handleKeydown = function(evt)
 {
+    if (this.enteringText) return;
     var code = evt.which;
     var charCode = String.fromCharCode(code);
     //console.log(code+" = "+charCode);
 
     // first check mode tools
     if (charCode in this.currentTools) {
-	this.currentTools[charCode].func.apply(this, evt);
-	return;
+	    this.currentTools[charCode].func.apply(this, evt);
+	    return;
     }
     var pd = true;
     switch (charCode) {
     case 'I':
-	this.canvas.zoom(1.1);
-	this.page.render();
-	break;
+	    this.canvas.zoom(1.1);
+	    this.page.render();
+	    break;
 
     case 'O':
-	this.canvas.zoom(0.9);
-	this.page.render();
-	break;
+	    this.canvas.zoom(0.9);
+	    this.page.render();
+	    break;
 
     case  'A':
-	this.page.showlots();
-	break;
+	    this.page.showlots();
+	    break;
 
     case  'R':
-	this.changeMode(UI.Mode.AddRect);
-	break;
+	    this.changeMode(UI.Mode.AddRect);
+	    break;
 
     default:
-	switch (code) {
-	case  37:
-	    // move left
-	    this.canvas.pan(new Point(20, 0));
-	    this.page.render();
-	    break;
+	    switch (code) {
+	    case  37:
+	        // move left
+	        this.canvas.pan(new Point(20, 0));
+	        this.page.render();
+	        break;
 
-	case  39:
-	    // move right
-	    this.canvas.pan(new Point(-20, 0));
-	    this.page.render();
-	    break;
+	    case  39:
+	        // move right
+	        this.canvas.pan(new Point(-20, 0));
+	        this.page.render();
+	        break;
 
-	case  40:
-	    // move down
-	    this.canvas.pan(new Point(0, -20));
-	    this.page.render();
-	    break;
+	    case  40:
+	        // move down
+	        this.canvas.pan(new Point(0, -20));
+	        this.page.render();
+	        break;
 
-	case  38:
-	    this.canvas.pan(new Point(0, 20));
-	    this.page.render();
-	    break;
+	    case  38:
+	        this.canvas.pan(new Point(0, 20));
+	        this.page.render();
+	        break;
 
-	case 27:
-	    this.resetMode();
-	    break;
+	    case 27:
+	        this.resetMode();
+	        break;
 
-	default:
-	    console.log('Key is '+code);
-	    pd = false;
-	}
+	    default:
+	        console.log('Key is '+code);
+	        pd = false;
+	    }
     }
     if (pd) evt.preventDefault();
 };
+
+UI.prototype.showEditor = function()
+{
+    this.enteringText = true;
+    $('#textentry').css("display", "block");
+    this.keyboard.showAll();
+}
 
 UI.prototype.installHandlers = function()
 {
@@ -332,6 +351,27 @@ UI.prototype.installHandlers = function()
     $('body').keydown(function(evt) {
 	    me.handleKeydown(evt);
     });
+    // special handlers
+    $('#textentry').draggable();
+    var me = this;
+    $('#textentry input').click(function(evt) { 
+        var btext = $(this).val();
+        if (btext == "done") {
+            me.keyboard.hide();
+            me.enteringText = false;
+            me.page.finishText($('#textentry textarea').val());
+            $('#textentry').css('display', 'none'); 
+        } else if (btext == "cancel") {
+            me.keyboard.hide();
+            me.enteringText = false;
+            $('#textentry').css('display', 'none'); 
+        } else {
+            console.log(btext);
+            me.keyboard.init();
+            me.keyboard.show();
+        }
+        
+    });
 };
 
 UI.tools['main'] = {
@@ -351,7 +391,8 @@ UI.tools['selected'] = {
     'R': {show:'r', prompt: 'create link to reference', func: UI.prototype.startReference.curry('toref')},
     'S': {show:'s', prompt: 'create link to source', func: UI.prototype.startReference.curry('fromref')},
     'N': {show:'n', prompt: 'add note', func: UI.prototype.startNote.curry('general')},
-    'B': {show:'b', prompt: 'add background note', func: UI.prototype.startNote.curry('background')}
+    'B': {show:'b', prompt: 'add background note', func: UI.prototype.startNote.curry('background')},
+    'D': {show:'d', prompt: 'delete shape (and links)', func: UI.prototype.deleteIt}
 };
 
 // Local Variables:
