@@ -700,151 +700,152 @@ VTextArea.prototype.drawKeyboard = function () {
     }
 };
 VTextArea.prototype.wireEvents = function () {
-    var a = this;
+    var me = this;
     $("#VKeyboard-keyboard").delegate("button", "mousedown", function (c) {
         var b = this.id;
 	console.log("mousedown: "+b);
-        a.interval = setInterval(function () {
-            a.counter++;
-            if (a.counter > 5) {
+        me.interval = setInterval(function () {
+            me.counter++;
+            if (me.counter > 5) {
                 switch (b) {
-                    case "VKeyboard-backspace":
-                        a.onBackspace();
-                        break;
-                    default:
-                        if (b.search("VKeyboard-k([0-9])|([1-3][0-9])|(4[0-7])") != -1) {
-                            a.onKey(b.substr(7));
-                            a.shift = false;
-                            a.alt = false;
-                            a.ctrl = false;
-                            a.drawKeyboard()
-                        }
-                        break
+                case "VKeyboard-backspace":
+                    me.onBackspace();
+                    break;
+                default:
+                    if (b.search("VKeyboard-k([0-9])|([1-3][0-9])|(4[0-7])") != -1) {
+                        me.onKey(b.substr(7));
+                        me.shift = false;
+                        me.alt = false;
+                        me.ctrl = false;
+                        me.drawKeyboard()
+                    }
+                    break
                 }
             }
         }, 50)
     });
     $("#VKeyboard-keyboard").delegate("button", "mouseup", function (b) {
-        a.stopRepeat()
+        me.stopRepeat()
     });
     $("#VKeyboard-keyboard").delegate("button", "mouseout", function (b) {
-        a.stopRepeat()
+        me.stopRepeat()
     });
     $("#VKeyboard-keyboard").delegate("button", "click", function (c) {
         var b = this.id;
 	console.log("click: "+b);
         switch (b) {
-            case "VKeyboard-left-shift":
-            case "VKeyboard-right-shift":
-                a.onShift();
-                break;
-            case "VKeyboard-left-alt":
-            case "VKeyboard-right-alt":
-                a.onCtrl();
-                a.onAlt();
-                break;
-            case "VKeyboard-left-ctrl":
-            case "VKeyboard-right-ctrl":
-                a.onAlt();
-                a.onCtrl();
-                break;
+        case "VKeyboard-left-shift":
+        case "VKeyboard-right-shift":
+            me.onShift();
+            break;
+        case "VKeyboard-left-alt":
+        case "VKeyboard-right-alt":
+            me.onCtrl();
+            me.onAlt();
+            break;
+        case "VKeyboard-left-ctrl":
+        case "VKeyboard-right-ctrl":
+            me.onAlt();
+            me.onCtrl();
+            break;
 	case "VKeyboard-escape":
-            case "VKeyboard-swap":
-                a.onEsc();
-                break;
-            case "VKeyboard-caps-lock":
-                a.onCapsLock();
-                break;
-            case "VKeyboard-backspace":
-                a.onBackspace();
-                break;
-            case "VKeyboard-enter":
-                a.onEnter();
-                break;
-            case "VKeyboard-space":
-                a.onSpace();
-                break;
-            default:
-                if (b.search("VKeyboard-k([0-9])|([1-3][0-9])|(4[0-7])") != -1) {
-                    a.onKey(b.substr(10));
-                    a.shift = false;
-                    a.alt = false;
-                    a.ctrl = false;
-                    a.drawKeyboard()
-                }
-                break
+        case "VKeyboard-swap":
+            me.onEsc();
+	    $('#'+this.textareaId).focus();
+            break;
+        case "VKeyboard-caps-lock":
+            me.onCapsLock();
+            break;
+        case "VKeyboard-backspace":
+            me.onBackspace();
+            break;
+        case "VKeyboard-enter":
+            me.onEnter();
+            break;
+        case "VKeyboard-space":
+            me.onSpace();
+            break;
+        default:
+            if (b.search("VKeyboard-k([0-9])|([1-3][0-9])|(4[0-7])") != -1) {
+                me.onKey(b.substr(10));
+                me.shift = false;
+                me.alt = false;
+                me.ctrl = false;
+                me.drawKeyboard()
+            }
+            break
         }
     });
-    a.textbox.bind("keydown", function (d) {
+    me.textbox.bind("keydown", function (d) {
         var c = VKeyboard.keyCode(d);
-        if ((c == 65 || c == 67 || c == 86 || c == 88 || c == 89 || c == 90) && (a.ctrl && !a.alt && !a.shift)) {
+        if ((c == 65 || c == 67 || c == 86 || c == 88 || c == 89 || c == 90) && (me.ctrl && !me.alt && !me.shift)) {
             return
         }
-        if (a.currentLayout == a.defaultLayout && c != 27) {
+        if (me.currentLayout == me.defaultLayout && c != 27) {
             return
         }
         switch (c) {
-            case 17:
-                a.ctrl = false;
-                a.onCtrl();
-                break;
-            case 18:
-                a.alt = false;
-                a.onAlt();
-                break;
-            case 16:
-                a.shift = false;
-                a.onShift();
-                break;
-            case 27:
-                a.onEsc();
-                break;
-            case 8:
-                a.onBackspace();
+        case 17:
+            me.ctrl = false;
+            me.onCtrl();
+            break;
+        case 18:
+            me.alt = false;
+            me.onAlt();
+            break;
+        case 16:
+            me.shift = false;
+            me.onShift();
+            break;
+        case 27:
+            me.onEsc();
+            break;
+        case 8:
+            me.onBackspace();
+            d.preventDefault();
+            break;
+        case 32:
+            me.onSpace();
+            d.preventDefault();
+            break;
+        case 10:
+            me.onEnter();
+            d.preventDefault();
+            break;
+        default:
+            var b = VKeyboard.layout.getKeyId(VKeyboard.keyCode(d));
+            if (b != -1) {
+                me.onKey("k" + b);
+                me.drawKeyboard();
                 d.preventDefault();
-                break;
-            case 32:
-                a.onSpace();
-                d.preventDefault();
-                break;
-            case 10:
-                a.onEnter();
-                d.preventDefault();
-                break;
-            default:
-                var b = VKeyboard.layout.getKeyId(VKeyboard.keyCode(d));
-                if (b != -1) {
-                    a.onKey("k" + b);
-                    a.drawKeyboard();
-                    d.preventDefault();
-                    a.cancelkeypress = true
-                }
-                break
+                me.cancelkeypress = true
+            }
+            break
         }
     });
     if ($.browser.opera) {
-        a.textbox.bind("keypress", function (b) {
+        me.textbox.bind("keypress", function (b) {
             if (this.cancelkeypress) {
                 b.preventDefault();
-                a.cancelkeypress = false
+                me.cancelkeypress = false
             }
         })
     }
-    a.textbox.bind("keyup", function (b) {
+    me.textbox.bind("keyup", function (b) {
         switch (VKeyboard.keyCode(b)) {
-            case 17:
-                a.ctrl = true;
-                a.onCtrl();
-                break;
-            case 18:
-                a.alt = true;
-                a.onAlt();
-                break;
-            case 16:
-                a.shift = true;
-                a.onShift();
-                break;
-            default:
+        case 17:
+            me.ctrl = true;
+            me.onCtrl();
+            break;
+        case 18:
+            me.alt = true;
+            me.onAlt();
+            break;
+        case 16:
+            me.shift = true;
+            me.onShift();
+            break;
+        default:
         }
     });
 };
