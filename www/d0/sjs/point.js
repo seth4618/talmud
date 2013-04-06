@@ -258,94 +258,6 @@ Shape.prototype.getCenterPoint = function()
  * @param {!Point} s
  * @return {boolean}
  **/
-if (0) {
-Shape.prototype.intersect = function(p, q, r, s)
-{
-    //#removeIfShip
-    if (0) {
-	    var cnv = Canvas.getLast();
-	    var ctx = cnv.getContext();
-	    ctx.beginPath();
-	    console.log('Checking ['+[p.asString(),q.asString()].join(",")+']  against ['+[r.asString(),s.asString()].join(",")+']');
-	    ctx.strokeStyle = "blue";
-	    ctx.lineWidth = 4;
-	    ctx.moveTo(p.x(), p.y());
-	    ctx.lineTo(q.x(),q.y());
-	    ctx.stroke();
-	    ctx.strokeStyle = "pink";
-	    ctx.moveTo(r.x(), r.y());
-	    ctx.lineTo(s.x(),s.y());
-	    ctx.stroke();
-	    ctx.closePath();
-    }
-    //#endremoveIfShip
-
-    var d1, d2;
-    var a1, a2, b1, b2, c1, c2;
-
-    // Convert vector 1 to a line (line 1) of infinite length.
-    // We want the line in linear equation standard form: A*x + B*y + C = 0
-    // See: http://en.wikipedir.org/wiki/Linear_equation
-    if (0) {
-    a1 = q.y() - p.y();
-    b1 = p.x() - q.x();
-    c1 = (q.x() * p.y()) - (p.x() * q.y());
-    } else {
-        var dx = q.x()-p.x();
-        var dy = q.y()-p.y();
-        a1 = dx;
-        b1 = -dy;
-        c1 = p.y()*dy-p.x()*dx;
-    }
-    // Every point (x,y), that solves the equation above, is on the line,
-    // every point that does not solve it, is either above or below the line.
-    // We insert (x1,y1) and (x2,y2) of vector 2 into the equation above.
-    d1 = (a1 * r.x()) + (b1 * r.y()) + c1;
-    d2 = (a1 * s.x()) + (b1 * s.y()) + c1;
-
-    // If d1 and d2 both have the same sign, they are both on the same side of
-    // our line 1 and in that case no intersection is possible. Careful, 0 is
-    // a special case, that's why we don't test ">=" and "<=", but "<" and ">".
-    if (d1 > 0 && d2 > 0) return false;
-    if (d1 < 0 && d2 < 0) return false;
-
-    // We repeat everything above for vector 2.
-    // We start by calculating line 2 in linear equation standard form.
-    if (0) {
-    a2 = s.y() - r.y();
-    b2 = r.x() - s.x();
-    c2 = (s.x() * r.y()) - (r.x() * s.y());
-    } else {
-        var dx = s.x()-r.x();
-        var dy = s.y()-r.y();
-        a2 = dx;
-        b2 = -dy;
-        c2 = r.y()*dy-r.x()*dx;
-    }
-    
-    // Calulate d1 and d2 again, this time using points of vector 1
-    d1 = (a2 * p.x()) + (b2 * p.y()) + c2;
-    d2 = (a2 * q.x()) + (b2 * q.y()) + c2;
-
-    // Again, if both have the same sign (and neither one is 0),
-    // no intersection is possible.
-    if (d1 > 0 && d2 > 0) return false;
-    if (d1 < 0 && d2 < 0) return false;
-
-    // If we get here, only three possibilities are left. Either the two
-    // vectors intersect in exactly one point or they are collinear
-    // (they both lie both on the same infinite line), in which case they
-    // may intersect in an infinite number of points or not at all.
-    if ((a1 * b2) - (a2 * b1) == 0.0) {
-	    console.log('CO-LINEAR');
-	    return false;		// THIS IS ACTUALLY COLINEAR.  NOT SURE IF WE SHOULD COUNT IT OR NOT.  I THINK IT IS UNLIKELY GIVEN MY DEF OF rayOrigin
-    }
-
-    // If they are not collinear, they must intersect in exactly one point.
-    return true;
-};
-}
-
 Shape.prototype.intersect = function(p0, p1, p2, p3, getpoint)
 {
     var s1_x = p1.x() - p0.x();     
@@ -382,6 +294,17 @@ Shape.prototype.findOverlapOfBB = function(other)
     var xOverlap = Math.max(0, Math.min(x12,x22) - Math.max(x11,x21));
     var yOverlap = Math.max(0, Math.min(y12,y22) - Math.max(y11,y21));
     return xOverlap*yOverlap;
+};
+
+/**
+ * finalizeMove
+ *
+ * some shapes may need some updating after a change in their
+ * parameters is made.  (E.g., NGons)
+ *
+ **/
+Shape.prototype.finalizeMove = function()
+{
 };
 
 ////////////////////////////////////////////////////////////////
@@ -807,6 +730,26 @@ NGon.prototype.intersect = function(p, q, i, j, getpoint)
     // does pq intersect rs?
     return Shape.prototype.intersect.call(this, p, q, r, s, getpoint);
 };
+
+/**
+ * finalizeMove
+ *
+ * some shapes may need some updating after a change in their
+ * parameters is made.  (E.g., NGons).  make trace[0].x() &
+ * trace[0].y() be the same as this.x and this.y - and adjust all
+ * other shapes.
+ *
+ **/
+NGon.prototype.finalizeMove = function()
+{
+    var delta = new Point(this.x() - this.trace[0].x(),
+                          this.y() - this.trace[0].y());
+    var len = this.trace.length;
+    for (var i=0; i<len; i++) {
+        this.trace[i] = this.trace[i].plus(delta);
+    }
+};
+
 
 NGon.prototype.convertToDB = function()
 {
