@@ -16,6 +16,7 @@ function UI(canvas, page)
     this.installHandlers();
     this.clearSelection();
     this.changeMode(UI.Mode.Quiet);
+    this.mouseIsDown = false;
 }
 
 /** @enum */ 
@@ -23,13 +24,17 @@ UI.Mode = {
     Quiet: 0,
     MarkPassage: 1,
     AddRect: 2,
-    Selected: 3
+    Selected: 3,
+    Dragging: 4
 };
 
 UI.tools = {};
 
 /** @type {!Canvas} */ UI.prototype.canvas;
 /** @type {!Page} */ UI.prototype.page;
+/** 
+ *  track if mouse is down or not
+ * @type {boolean} */ UI.prototype.mouseIsDown;
 
 /**
  * changeMode
@@ -40,6 +45,8 @@ UI.tools = {};
  **/
 UI.prototype.changeMode = function(newmode)
 {
+    if (newmode == this.mode) return;
+
     switch (newmode)
     {
     case UI.Mode.Quiet:
@@ -50,6 +57,7 @@ UI.prototype.changeMode = function(newmode)
 	    this.currentTools = UI.tools['marking'];
 	    break;
 
+    case UI.Mode.Dragging:
     case UI.Mode.Selected:
 	    this.currentTools = UI.tools['selected'];
 	    break;
@@ -107,23 +115,85 @@ UI.prototype.handleClick = function(evt, cnv)
 
 UI.prototype.handleMouseDown = function(evt, cnv)
 {
+    // track where we clicked in case we need it later
+    this.lastDown = cnv.mouseAt.copy();
+    this.mouseIsDown = true;
+    // see if there is a mode specific action to take
     if (this.mode == UI.Mode.MarkPassage)
 	this.page.addPassagePoint(cnv.mouseAt, true);
 };
 
 UI.prototype.handleMouseUp = function(evt, cnv)
 {
-    if (this.mode == UI.Mode.MarkPassage) {
-	this.page.addPassagePoint(cnv.mouseAt, false);
-    }
+    this.mouseIsDown = false;
+    switch (this.mode) {
+    case UI.Mode.MarkPassage:
+	    this.page.addPassagePoint(cnv.mouseAt, false);
+        break;
+    case UI.Mode.Dragging:
+        this.endDrag(cnv.mouseAt);
+        this.changeMode(UI.Mode.Selected);
+        break;
+    } 
 };
 
 UI.prototype.handleMouseMove = function(evt, cnv)
 {
-    if (this.mode == UI.Mode.MarkPassage) {
-	this.page.tempShowPassage(cnv.mouseAt);
+    switch (this.mode) {
+    case UI.Mode.MarkPassage:
+	    this.page.tempShowPassage(cnv.mouseAt);
+        break;
+    case UI.Mode.Dragging:
+        this.doDrag(cnv.mouseAt);
+        break;
+    case UI.Mode.Quiet:
+    case UI.Mode.Selected:
+        if (this.mouseIsDown) {
+            // mouse is down, see if we should start dragging mode
+	        if (this.page.selectObjectAt(this.lastDown)) {            
+                this.changeMode(UI.Mode.Dragging);
+                this.startDrag(cnv.mouseAt);
+            }
+        }
+        break;
+    default:
     }
 };
+
+UI.prototype.renderDrag = function()
+{
+    this.canvas.scratchpad.clear();
+    this.dragShape.renderAt(this.canvas.scratchpad, 
+                            this.dragShape.x(),
+                            this.dragShape.y());
+};
+
+UI.prototype.startDrag = function(pt)
+{
+    var x = this.page.getSelectedShape();
+    if (x == null) alert('null start drag');
+    this.dragShape = x.container;
+    this.dragOffset = new Point(this.dragShape.x()-this.lastDown.x(),
+                                this.dragShape.y()-this.lastDown.y());
+    var me = this;
+    this.dragInterval = setInterval(function() { me.renderDrag(); }, 50);
+    this.doDrag(pt);
+};
+
+UI.prototype.doDrag = function(pt)
+{
+    this.dragShape.x(pt.x()+this.dragOffset.x());
+    this.dragShape.y(pt.y()+this.dragOffset.y());
+};
+
+UI.prototype.endDrag = function(pt)
+{
+    this.doDrag(pt);
+    clearInterval(this.dragInterval);
+    this.dragShape.finalizeMove();
+    this.page.render();
+};
+
 
 /**
  * startPassage
