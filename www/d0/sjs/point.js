@@ -279,6 +279,15 @@ Shape.prototype.intersect = function(p0, p1, p2, p3, getpoint)
     return false; // No collision
 };
 
+Shape.prototype.containsQ = function(other)
+{
+    if (this.lowerleft().x() > other.lowerleft().x()) return false;
+    if (this.lowerleft().y() < other.lowerleft().y()) return false;
+    if (this.upperright().x() < other.upperright().x()) return false;
+    if (this.upperright().y() > other.upperright().y()) return false;
+    return true;
+};
+
 Shape.prototype.findOverlapOfBB = function(other)
 {
     var x11 = this.lowerleft().x();
@@ -300,11 +309,13 @@ Shape.prototype.findOverlapOfBB = function(other)
  * finalizeMove
  *
  * some shapes may need some updating after a change in their
- * parameters is made.  (E.g., NGons)
+ * parameters is made.  (E.g., NGons).  And they will need storing in
+ * DB too.
  *
  **/
 Shape.prototype.finalizeMove = function()
 {
+    console.log("Finalize: "+this.asString());
 };
 
 ////////////////////////////////////////////////////////////////
@@ -748,6 +759,7 @@ NGon.prototype.finalizeMove = function()
     for (var i=0; i<len; i++) {
         this.trace[i] = this.trace[i].plus(delta);
     }
+    NGon.super_.prototype.finalizeMove.call(this);
 };
 
 
