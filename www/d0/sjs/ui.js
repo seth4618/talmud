@@ -172,7 +172,9 @@ UI.prototype.startDrag = function(pt)
 {
     var x = this.page.getSelectedShape();
     if (x == null) alert('null start drag');
+    this.dragOutline = x;
     this.dragShape = x.container;
+    this.dragInitialPosition = new Point(this.dragShape.x(), this.dragShape.y());
     this.dragOffset = new Point(this.dragShape.x()-this.lastDown.x(),
                                 this.dragShape.y()-this.lastDown.y());
     var me = this;
@@ -190,7 +192,7 @@ UI.prototype.endDrag = function(pt)
 {
     this.doDrag(pt);
     clearInterval(this.dragInterval);
-    this.dragShape.finalizeMove();
+    this.dragOutline.finalizeMove(this.dragInitialPosition);
     this.page.render();
 };
 
