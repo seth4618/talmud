@@ -155,6 +155,7 @@ Page.prototype.showlots = function()
 
 Page.prototype.renderShape = function(s)
 {
+    //console.log('Rendering: '+s.asString());
     s.render(this.canvas);
 }
 
@@ -212,80 +213,80 @@ Page.prototype.endPassage = function(kind)
     var upperright = points[0].copy();
     var s = [];
     for (var i=0; i<points.length; i++) {
-	var p = points[i];
-	s.push(p.asString(1));
-	if (p.x() > upperright.x()) upperright.x(p.x());
-	if (p.x() < lowerleft.x()) lowerleft.y(p.y());
-	if (p.y() < upperright.y()) upperright.y(p.y());
-	if (p.y() > lowerleft.y()) lowerleft.y(p.y());
+	    var p = points[i];
+	    s.push(p.asString(1));
+	    if (p.x() > upperright.x()) upperright.x(p.x());
+	    if (p.x() < lowerleft.x()) lowerleft.y(p.y());
+	    if (p.y() < upperright.y()) upperright.y(p.y());
+	    if (p.y() > lowerleft.y()) lowerleft.y(p.y());
     }
     if (points.length > 2 ) {
-	this.passage.lineheight = points[2].y()-upperright.y();
+	    this.passage.lineheight = points[2].y()-upperright.y();
     }
     var lineheight = this.passage.lineheight;
     //console.log(lineheight+" LL:"+lowerleft.asString(1)+" UR:"+upperright.asString(1)+" ["+s.join(", ")+"]");
     this.canvas.scratchpad.clear();
 
     if (points.length == 3) {
-	points.splice(2,1);
+	    points.splice(2,1);
     }
 
     var trace = [];
     var numpoints;
     var p;
     if (points.length >= 2) {
-	p = new Point(points[0].x(), upperright.y());
-	trace.push(p);
-	p = new Point(lowerleft.x(), upperright.y());
-	trace.push(p);
+	    p = new Point(points[0].x(), upperright.y());
+	    trace.push(p);
+	    p = new Point(lowerleft.x(), upperright.y());
+	    trace.push(p);
     }
     if (points.length == 2) {
-	// use lineheight to complete the square
-	trace.push(new Point(lowerleft.x(), upperright.y()+lineheight));
-	trace.push(new Point(upperright.x(), upperright.y()+lineheight));
-	numpoints = 4;
+	    // use lineheight to complete the square
+	    trace.push(new Point(lowerleft.x(), upperright.y()+lineheight));
+	    trace.push(new Point(upperright.x(), upperright.y()+lineheight));
+	    numpoints = 4;
     } else if (points.length == 4) {
-	// layout if we got 4 points [orignal-point]
-	// numbers not in brackets represent the location in the trace array
-	//
-	// 1               0
-	// [1]------------[0]
-	// |		   |
-	// |		   |
-	// |	       	   +---[2]4
-	// |		   5	|
-	// |			|
-	// +-------------------[3]
-	// 2                    3
-	//
-	trace.push(new Point(lowerleft.x(), points[3].y()));
-	trace.push(new Point(upperright.x(), points[3].y()));
-	trace.push(new Point(upperright.x(), points[2].y()));
-	trace.push(new Point(points[0].x(), points[2].y()));
-	numpoints = 6;
+	    // layout if we got 4 points [orignal-point]
+	    // numbers not in brackets represent the location in the trace array
+	    //
+	    // 1               0
+	    // [1]------------[0]
+	    // |		   |
+	    // |		   |
+	    // |	       	   +---[2]4
+	    // |		   5	|
+	    // |			|
+	    // +-------------------[3]
+	    // 2                    3
+	    //
+	    trace.push(new Point(lowerleft.x(), points[3].y()));
+	    trace.push(new Point(upperright.x(), points[3].y()));
+	    trace.push(new Point(upperright.x(), points[2].y()));
+	    trace.push(new Point(points[0].x(), points[2].y()));
+	    numpoints = 6;
     } else if (points.length == 6) {
-	// layout if we got 6 points [orignal-point]
-	// numbers not in brackets represent the location in the trace array
-	//
-	// 1               0
-	// [1]------------[0]
-	// |		   |
-	// |		   |
-	// |	       	   +---[2]6
-	// |		   7   	|
-	// |2		    	|
-	// +------------+      [3]
-	//             3|       |
-	//		|   	|
-	//     	       [5]-----[4]
-	//		4      	5
-	trace.push(new Point(lowerleft.x(), points[3].y())); // 2
-	trace.push(new Point(points[5].x(), points[3].y())); // 3
-	trace.push(new Point(points[5].x(), lowerleft.y())); // 4
-	trace.push(new Point(upperright.x(), lowerleft.y())); // 5
-	trace.push(new Point(upperright.x(), points[2].y())); // 6
-	trace.push(new Point(points[0].x(), points[2].y())); // 7
-	numpoints = 8;
+	    // layout if we got 6 points [orignal-point]
+	    // numbers not in brackets represent the location in the trace array
+	    //
+	    // 1               0
+	    // [1]------------[0]
+	    // |		   |
+	    // |		   |
+	    // |	       	   +---[2]6
+	    // |		   7   	|
+	    // |2		    	|
+	    // +------------+      [3]
+	    //             3|       |
+	    //		|   	|
+	    //     	       [5]-----[4]
+	    //		4      	5
+	    trace.push(new Point(lowerleft.x(), points[3].y())); // 2
+	    trace.push(new Point(points[5].x(), points[3].y())); // 3
+	    trace.push(new Point(points[5].x(), lowerleft.y())); // 4
+	    trace.push(new Point(upperright.x(), lowerleft.y())); // 5
+	    trace.push(new Point(upperright.x(), points[2].y())); // 6
+	    trace.push(new Point(points[0].x(), points[2].y())); // 7
+	    numpoints = 8;
     }
     this.addShape(new NGon(trace, new Annotation(kind)));
     this.render();
@@ -310,6 +311,18 @@ Page.prototype.addShape = function(s, cb)
     } else {
         out = s;
     }
+    // check to see if it is a child of another shape, e.g., contained
+    // within a current outline
+    for (var i=0; i<this.shapes.length; i++) {
+        var pp = this.shapes[i];
+        var parent = pp.containsQ(out);
+        if (parent != null) {
+            parent.addChild(out);
+            break;
+        }
+    }
+
+    // put this on list and save it to db
     this.shapes.push(out);
     var me = this;
     out.insert(function() {
@@ -539,7 +552,10 @@ Page.convertFromDB = function(recd, cb)
         me.init(recd.path, src, function(p) {});
         var sync = new Synchronizer(function() { cb(me); }, recd.shapes.length+1, "pageload");
         for (var i=0; i<recd.shapes.length; i++) {
-            Outline.find(recd.shapes[i], function(s) { me.shapes.push(s); console.log('page loaded shape: '+s.asString()); sync.done(1); });
+            Outline.find(recd.shapes[i], function(s) { 
+                me.shapes.push(s); 
+                //console.log('page loaded shape: '+s.asString()); 
+                sync.done(1); });
         }
         sync.done(1);
     });
