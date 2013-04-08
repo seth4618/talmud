@@ -11,6 +11,8 @@ function Outline(id)
     this.targets = [];
     this.selected = false;
     this.deleted = null;
+    this.children = [];
+    this.parent = null;
 }
 
 /**
@@ -30,6 +32,8 @@ Outline.table = 'shape';
 /** @type {!Shape} */ Outline.prototype.container;
 /** @type {!Array.<!Outline>} */ Outline.prototype.targets;
 /** @type {Date} */ Outline.prototype.deleted;
+/** @type {!Array.<!Outline>} */ this.children;
+/** @type {Outline} */ this.parent;
 
 /**
  * find
@@ -53,6 +57,7 @@ Outline.find = function(id, cb)
  **/
 Outline.convertFromDB = function(recd, cb)
 {
+    //console.log(recd);
     s = Outline.all[recd._id];
     s.init(Shape.convertFromDB(recd.shape));
     if ('deleted' in recd) {
@@ -63,7 +68,13 @@ Outline.convertFromDB = function(recd, cb)
         cb(s);
         return;
     }
-    var sync = new Synchronizer(function() {     cb(s); }, recd.targets.length+1, "Outlineload");
+    if (!('parent' in recd)) {
+        recd.parent = null;
+    }
+    var sync = new Synchronizer(function() {     //console.log("done"); console.log(recd); console.log(s); 
+        cb(s); }, 
+                                recd.targets.length+1, 
+                                "Outlineload");
     for (var i=0; i<recd.targets.length; i++) {
 	    if (recd.targets[i] == undefined) {
 	        console.log('UNDEFINED TARGET for outline'+recd._id);
@@ -72,11 +83,36 @@ Outline.convertFromDB = function(recd, cb)
             s.assignTarget(i, recd.targets[i], sync);
 	    }
     }
+    if (0) {
+        for (var i=0; i<recd.children.length; i++) {
+	        if (recd.children[i] == undefined) {
+	            console.log('UNDEFINED CHILD for outline'+recd._id);
+	            sync.done(1);
+	        } else {
+                s.assignChild(i, recd.children[i], sync);
+	        }
+        }
+    }
     if ('text' in recd) {
 	    s.text = recd.text;
 	    s.font = recd.font;
     }
-    sync.done(1);
+    if (('parent' in recd) && (recd.parent != -1) && (recd.parent != null)) {
+        if ((typeof recd.parent)=="object") {
+            console.log('tried to find object record:'+recd.parent);
+            recd.parent = recd.parent._id;
+        }
+        //console.log('Finding parent: '+recd.parent);
+        Outline.find(recd.parent, function(p) {
+            s.parent = p;
+            p.children.push(s);
+            //console.log('parent:'+p._id+' and child:'+s._id);
+            sync.done(1);
+        });
+    } else {
+        s.parent = null;
+        sync.done(1);
+    }
 };
 
 Outline.prototype.asString = function()
@@ -86,14 +122,28 @@ Outline.prototype.asString = function()
                    ':', 
                    (this.deleted?'DELETED':''),
                    (this.selected?'SELECTED':''),
-                   (this.container?this.container.asString():'undefined-container'), 
-                   ' -> ',
-                   this.targets.length,
+                   (this.container
+                    	? this.container.asString()
+	                    : 'undefined-container'), 
+                   ' parent:',
+                   (this.parent ? this.parent._id : '-'),
+                   ' children:',
+                   this.children.length 
                  ];
+    if (this.children.length > 0) {
+        result.push(':');
+        for (i=0; i<this.children.length; i++) {
+            result.push(this.children[i]._id);
+            if (i+1 < this.children.length) result.push(',');
+        }
+    }
+    result.push(' -> ');
+    result.push(this.targets.length);
     if (this.targets.length > 0) {
         result.push(':');
         for (i=0; i<this.targets.length; i++) {
             result.push((this.targets[i]._id)?this.targets[i]._id:'?');
+            if (i+1 < this.targets.length) result.push(',');
         }
     }
     return result.join('');
@@ -133,6 +183,11 @@ Outline.prototype.updateDB = function(cb)
     });
 };
 
+/**
+ * convertToDB
+ * convert object to recd for db
+ *
+ **/
 Outline.prototype.convertToDB = function()
 {
     var recd = {};
@@ -148,6 +203,11 @@ Outline.prototype.convertToDB = function()
     if (('deleted' in this)&&(this.deleted != null)) {
         recd.onpage = this.onpage;
         recd.deleted = this.deleted;
+    }
+    if (this.parent != null) {
+        recd.parent = this.parent._id;
+    } else {
+        recd.parent = -1;
     }
     return recd;
 };
@@ -171,6 +231,52 @@ Outline.prototype.assignTarget = function(t, id, sync)
         me.targets[t] = s;
         sync.done(1);
     });
+};
+
+Outline.prototype.assignChild = function(t, id, sync)
+{
+    var me = this;
+    Outline.find(id, function(s) {
+        me.children[t] = s;
+        sync.done(1);
+    });
+};
+
+Outline.prototype.containsQ = function(other)
+{
+    if (!this.container.containsQ(other.container)) return null;
+    // this outline contains other, see if any children also contain it
+    for (var i=0; i<this.children.length; i++) {
+        var c = this.children[i].containsQ(other);
+        if (c) return c;
+    }
+    return this;
+
+};
+
+Outline.prototype.finalizeMove = function(start)
+{
+    // update shape
+    this.container.finalizeMove();
+    // get delta for children
+    start = start.minus(new Point(this.container.x(), this.container.y()));
+    // now see about any children
+    for (var i=0; i<this.children.length; i++) {
+        var child = this.children[i];
+        var cc = child.container;
+        var ccStart = new Point(cc.x(), cc.y());
+        cc.x(cc.x()-start.x());
+        cc.y(cc.y()-start.y());
+        child.finalizeMove(ccStart);
+    }
+    this.updateDB();
+};
+
+Outline.prototype.addChild = function(c)
+{
+    this.children.push(c);
+    this.updateDB();
+    c.parent = this;
 };
 
 Outline.prototype.addRef = function(ref)
