@@ -25,7 +25,9 @@ UI.Mode = {
     MarkPassage: 1,
     AddRect: 2,
     Selected: 3,
-    Dragging: 4
+    Dragging: 4,
+    ShowNotes: 5,
+    HideNotes: 6
 };
 
 UI.tools = {};
@@ -52,6 +54,11 @@ UI.prototype.changeMode = function(newmode)
     case UI.Mode.Quiet:
 	    this.currentTools = UI.tools['main'];
 	    break;
+
+    case UI.Mode.ShowNotes:
+    case UI.Mode.HideNotes:
+        this.currentTools = UI.tools['showhide'];
+        break;
 
     case UI.Mode.MarkPassage:
 	    this.currentTools = UI.tools['marking'];
@@ -83,6 +90,7 @@ UI.prototype.showTools = function()
     $tools.empty();
     for (var label in this.currentTools) {
 	    var tool = this.currentTools[label];
+        if (('hidden' in tool)&&(tool.hidden)) continue;
 	    $tools.append('<li>'+tool.show+': '+tool.prompt+'</li>');
     }
 };
@@ -300,6 +308,41 @@ UI.prototype.showHelp = function(msg)
     $helparea.append('<span>'+msg+'</span>');
 };
 
+UI.prototype.showHideMenu = function(which, evt)
+{
+    var m;
+    var p;
+    if (which == 'show') {
+        m = UI.Mode.ShowNotes;
+        p = "SHOW";
+    } else if (which == 'hide') {
+        m = UI.Mode.HideNotes;
+        p = "HIDE";
+    } else alert('unknown showhide menu option');
+    this.changeMode(m);
+    this.showHelp('Pick which kind of notes to '+p+'.');
+};
+
+UI.prototype.showHide = function(which, evt)
+{
+    if (which == 'done') {
+        this.changeMode(UI.Mode.Quiet);
+        return;
+    }
+    if (which != 'all') which = Annotation.sfind(which);
+    this.page.changeHiddenShown(UI.Mode.ShowNotes == this.mode, which);
+    this.changeMode(UI.Mode.Quiet);
+    this.page.render();
+};
+
+UI.prototype.hideOutline = function(evt)
+{
+    this.page.getSelectedShape().hide();
+    this.clearSelection();
+    this.changeMode(UI.Mode.Quiet);
+    this.page.render();
+};
+
 /**
  * startNote
  * add note
@@ -325,7 +368,11 @@ UI.prototype.resetMode = function(evt)
     this.canvas.scratchpad.clear();
 };
 
-
+UI.prototype.beep = function()
+{
+    var snd = document.getElementById('beep');
+    snd.play();
+};
 
 UI.prototype.handleKeydown = function(evt)
 {
@@ -338,6 +385,9 @@ UI.prototype.handleKeydown = function(evt)
     if (charCode in this.currentTools) {
 	    this.currentTools[charCode].func.apply(this, evt);
 	    return;
+    } else if ('modal' in this.currentTools) {
+        charCode = 0;           // don't do anything else
+        this.beep();
     }
     var pd = true;
     switch (charCode) {
@@ -447,8 +497,23 @@ UI.prototype.installHandlers = function()
 };
 
 UI.tools['main'] = {
-    'M': {show:'m', prompt: 'start marking passage', func: UI.prototype.startPassage}
+    'M': {show:'m', prompt: 'start marking passage', func: UI.prototype.startPassage},
+    'S': {show:'s', prompt: 'show hidden notes', func: UI.prototype.showHideMenu.curry('show')},
+    'H': {show:'h', prompt: 'hide notes', func: UI.prototype.showHideMenu.curry('hide')}
 };
+
+UI.tools['showhide'] = {
+    'A': {show:'a', prompt: 'everything', func: UI.prototype.showHide.curry('all') },
+    'U': {show:'u', prompt: 'all unknown', func: UI.prototype.showHide.curry('unknown') },
+    'M': {show:'m', prompt: 'all Mishna', func: UI.prototype.showHide.curry('mishna') },
+    'G': {show:'g', prompt: 'all Gemora', func: UI.prototype.showHide.curry('gemora')},
+    'T': {show:'t', prompt: 'all Tosefot', func: UI.prototype.showHide.curry('tosefot')},
+    'R': {show:'r', prompt: 'all Rashi', func: UI.prototype.showHide.curry('rashi')},
+    'N': {show:'n', prompt: 'all Notes', func: UI.prototype.showHide.curry('translation')},
+    'Z': {show:'z', prompt: 'back to main menu', func: UI.prototype.showHide.curry('done')},
+    'modal': {hidden: true}
+};
+
 
 UI.tools['marking'] = {
     'f': {show:'f', prompt: 'finish and mark as unknown', func: UI.prototype.markPassageAs.curry('unknown') },
@@ -464,8 +529,13 @@ UI.tools['selected'] = {
     'S': {show:'s', prompt: 'create link to source', func: UI.prototype.startReference.curry('fromref')},
     'N': {show:'n', prompt: 'add note', func: UI.prototype.startNote.curry('general')},
     'B': {show:'b', prompt: 'add background note', func: UI.prototype.startNote.curry('background')},
-    'D': {show:'d', prompt: 'delete shape (and links)', func: UI.prototype.deleteIt}
+    'D': {show:'d', prompt: 'delete shape (and links)', func: UI.prototype.deleteIt},
+    'H': {show:'h', prompt: 'hide note from view (temporarily)', func: UI.prototype.hideOutline}
 };
+
+Util.addReadyHook(1000, function() {
+    $('#audioresource').append('<audio id="beep" preload="auto"><source src="images/beep.mp3" type=\'audio/mpeg codecs="mp3"\' /><source src="images/beep.wav" type=\'audio/wav\' /></audio>');
+});
 
 // Local Variables:
 // tab-width: 4
