@@ -157,7 +157,17 @@ Page.prototype.renderShape = function(s)
 {
     //console.log('Rendering: '+s.asString());
     s.render(this.canvas);
-}
+};
+
+
+Page.prototype.changeHiddenShown = function(showOrHide, which)
+{
+    for (var i=0; i<this.shapes.length; i++) {
+        var out = this.shapes[i];
+        if ((out.isHidden()==showOrHide)&&((which == 'all')||(which == out.getType())))
+            out.changeHiddenShown(showOrHide);
+    }
+};
 
 Page.prototype.addRect = function(p, w, h)
 {
@@ -165,22 +175,33 @@ Page.prototype.addRect = function(p, w, h)
     this.render(r);
 };
 
+Page.prototype.guessLineHeight = function(lh, pt)
+{
+    if (pt == undefined) return lh;
+    var idx = this.findObjectAt(pt);
+    if (idx == -1) return lh;
+    var glh = this.shapes[idx].getLineHeight();
+    if (glh) return glh;
+    return lh;
+};
+
 Page.prototype.startPassage = function()
 {
     this.selected = -1;
-    this.passage = {points: [ ], lineheight: 25};
+    this.passage = {points: [ ], lineheight: this.guessLineHeight(25)};
 };
 
 Page.prototype.addPassagePoint = function(p, start)
 {
     console.log((start?"starting line":"")+' and continue passage @ '+p.asString());
-    if (start)
-	this.passage.start = p;
-    else {
-	this.passage.points.push(this.passage.start);
-	delete this.passage.start;
-	this.passage.points.push(p);
-	this.guessPassage(this.passage, true);
+    if (start) {
+	    this.passage.start = p;
+        this.passage.lineheight = this.guessLineHeight(this.passage.lineheight, p);
+    } else {
+	    this.passage.points.push(this.passage.start);
+	    delete this.passage.start;
+	    this.passage.points.push(p);
+	    this.guessPassage(this.passage, true);
     }
 };
 
@@ -288,7 +309,10 @@ Page.prototype.endPassage = function(kind)
 	    trace.push(new Point(points[0].x(), points[2].y())); // 7
 	    numpoints = 8;
     }
-    this.addShape(new NGon(trace, new Annotation(kind)));
+    var out = new Outline();
+    out.init(new NGon(trace, new Annotation(kind)));
+    out.setLineHeight(lineheight);
+    this.addShape(out);
     this.render();
 };
 
@@ -450,21 +474,36 @@ Page.prototype.getSelectedShape = function()
     return this.shapes[this.selected];
 };
 
-// see if p is in an object
+// see if p is in an object and if so, select it
 Page.prototype.selectObjectAt = function(p)
 {
-    for (var i=this.shapes.length-1; i>=0; i--) {
+    var i = this.findObjectAt(p);
+    if (i >= 0) {
+	    this.selected = i;
 	    this.canvas.scratchpad.clear();
-	    //this.shapes[i].renderSelected(this.canvas);
-
-	    if (this.shapes[i].containsPoint(p)) {
-	        this.selected = i;
-	        this.canvas.scratchpad.clear();
-	        this.shapes[i].renderSelected(this.canvas);
-	        return true;
-	    }
-    }
+	    this.shapes[i].renderSelected(this.canvas);
+	    return true;
+	}
     return false;
+};
+
+/**
+ * findObjectAt
+ * find the smallest object that contains point p
+ * return -1 if none, otherwise index into this.shapes
+ *
+ * @private
+ * @param {!Point} p
+ * @return {number}
+ **/
+Page.prototype.findObjectAt = function(p)
+{
+    for (var i=this.shapes.length-1; i>=0; i--) {
+	    //this.canvas.scratchpad.clear();
+	    //this.shapes[i].renderSelected(this.canvas);
+	    if (this.shapes[i].containsPoint(p)) return i;
+    }
+    return -1;
 };
 
 /**
