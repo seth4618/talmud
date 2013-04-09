@@ -13,6 +13,8 @@ function Outline(id)
     this.deleted = null;
     this.children = [];
     this.parent = null;
+    this.hidden = false;
+    this.lineHeight = 0;
 }
 
 /**
@@ -34,6 +36,7 @@ Outline.table = 'shape';
 /** @type {Date} */ Outline.prototype.deleted;
 /** @type {!Array.<!Outline>} */ this.children;
 /** @type {Outline} */ this.parent;
+/** @type {number} */ this.lineHeight;
 
 /**
  * find
@@ -60,6 +63,7 @@ Outline.convertFromDB = function(recd, cb)
     //console.log(recd);
     s = Outline.all[recd._id];
     s.init(Shape.convertFromDB(recd.shape));
+    s.lineHeight = ('lineHeight' in recd) ? recd.lineHeight : 0;
     if ('deleted' in recd) {
         s.deleted = recd.deleted;
     };
@@ -149,6 +153,11 @@ Outline.prototype.asString = function()
     return result.join('');
 };
 
+Outline.prototype.getType = function()
+{
+    return this.container.type;
+};
+
 /**
  * insert
  * insert this one in the db.
@@ -193,6 +202,7 @@ Outline.prototype.convertToDB = function()
     var recd = {};
     recd.shape = this.container.convertToDB();
     recd.targets = [];
+    recd.lineHeight = this.lineHeight;
     for (var i=0; i<this.targets.length; i++) {
         recd.targets.push(this.targets[i]._id);
     }
@@ -211,6 +221,40 @@ Outline.prototype.convertToDB = function()
     }
     return recd;
 };
+
+/**
+ * hide
+ * hide this and all children from the current view - temporarily
+ *
+ **/
+Outline.prototype.hide = function()
+{
+    if (this.hidden == true) return;
+    this.hidden = true;
+    for (var i=0; i<this.children.length; i++) {
+        this.children[i].hide();
+    }
+};
+
+Outline.prototype.isHidden = function()
+{
+    return this.hidden;
+};
+
+Outline.prototype.unhide = function()
+{
+    if (this.hidden == false) return;
+    this.hidden = false;
+    for (var i=0; i<this.children.length; i++) {
+        this.children[i].unhide();
+    }
+};
+
+Outline.prototype.changeHiddenShown = function(dir)
+{
+    if (dir) return this.unhide();
+    this.hide();
+}
 
 /**
  * deleteMe
@@ -285,8 +329,19 @@ Outline.prototype.addRef = function(ref)
     this.updateDB();
 };
 
+Outline.prototype.setLineHeight = function(lh)
+{
+    this.lineHeight = lh;
+};
+
+Outline.prototype.getLineHeight = function(lh)
+{
+    return this.lineHeight;
+};
+
 Outline.prototype.render = function(target)
 {
+    if (this.hidden) return;
     this.container.render(target);
     var ctx = target.getContext();
     var color = this.container.type.getColor();
@@ -298,6 +353,7 @@ Outline.prototype.render = function(target)
     var center = this.container.getCenterPoint();
     for (var i=0; i<this.targets.length; i++) {
         if (this.targets[i].deleted != null) continue;
+        if (this.targets[i].hidden == true) continue;
 	    var targetContainer = this.targets[i].container;
         var tc = targetContainer.getCenterPoint();
         var from = this.container.getIntersectionWithPerimeter(center, tc);
@@ -404,26 +460,27 @@ Outline.prototype.prepareText = function(target, text)
     context.fillStyle = this.font.color;
     var maxWidth = this.container.width()-Outline.Xborder;
     var lineHeight = this.font.size*Outline.LineHeight;
+    this.setLineHeight(lineHeight);
     text = text.replace(/\s+$/g, '');
     text = text.replace(/\s+\n+/gm, '\n');
     var input = text.split('\n');
     for (inline=0; inline<input.length; inline++) {
-	var words = input[inline].split(' ');
-	var line = '';
-	for(var n = 0; n < words.length; n++) {
+	    var words = input[inline].split(' ');
+	    var line = '';
+	    for(var n = 0; n < words.length; n++) {
             var testLine = line + words[n] + ' ';
             var metrics = context.measureText(testLine);
             var testWidth = metrics.width;
             if(testWidth > maxWidth) {
-		lines.push(line);
-		line = words[n] + ' ';
+		        lines.push(line);
+		        line = words[n] + ' ';
             }
             else {
-		line = testLine;
+		        line = testLine;
             }
-	}
-	lines.push(line);
-	lines.push('');
+	    }
+	    lines.push(line);
+	    lines.push('');
     }
     lines.pop();
     return {text: lines, height: 3*Outline.Yborder/2+lines.length*lineHeight-(input.length-1)*lineHeight/2};
