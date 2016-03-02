@@ -1,0 +1,66 @@
+This repo was cloned from /home/seth/shared/jew/talmud/project on
+3/2/2016.  There are many untracked files which I might need, but it
+has been so long, I can't remember.
+
+?? data/
+?? server/.#alertmail.js
+?? server/.#item.js
+?? server/alertmail.js
+?? server/author.js
+?? server/config.js
+?? server/crud.js
+?? server/db/
+?? server/feo.js
+?? server/file.js
+?? server/high.js
+?? server/item.js
+?? server/main.js
+?? server/makedb.js.pdf
+?? server/mod.js
+?? server/node_modules/
+?? server/p.ps
+?? server/page.js
+?? server/parent.js
+?? server/post.js
+?? server/routing.js
+?? server/simpleblog.js
+?? server/test.js
+?? server/testsrc.js
+?? server/type.js.pdf
+?? server/types.test
+?? server/user.js
+?? www/b.html
+?? www/bad.html
+?? www/bs.css
+?? www/bv.css
+?? www/c.html
+?? www/d.html
+?? www/d0/sjs/149a.txt
+?? www/d0/sjs/foo.txt
+?? www/d0/sjs/hebrew.js
+?? www/d0/sjs/log.txt
+?? www/fonts/Ezra Unicode Convert30.pdf
+?? www/fonts/EzraSIL20to25.map
+?? www/fonts/EzraSIL20to25.tec
+?? www/fonts/HEB-map.xml
+?? www/fonts/Hebrew_MCtoUni50.map
+?? www/fonts/Hebrew_MCtoUni50.tec
+?? www/fonts/MC2se_2007.cct
+?? www/fonts/MC2se_2010.cct
+?? www/fonts/SILEzratoUni50.map
+?? www/fonts/SILEzratoUni50.tec
+?? www/fonts/WLC2sfm.cct
+?? www/fonts/iso-8859-1.map
+?? www/fonts/iso-8859-1.tec
+?? www/fonts/r2l.cct
+?? www/fonts/r2l_2004.cct
+?? www/fonts/se2de_2007.cct
+?? www/fonts/se2tr_2007.cct
+?? www/fonts/unpoint.cct
+?? www/images/beep.mp3
+?? www/images/beep.wav
+?? www/notes.txt
+?? www/vk.js
+?? www/x
+?? www/x.html
+?? www/x.js
