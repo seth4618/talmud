@@ -1,4 +1,6 @@
-// parser for google closure type annotations
+var Util = require("./util.js");
+
+// simple parser for google closure type annotations used in schema definitions
 
 /**
  * Type
@@ -7,8 +9,9 @@
  * @constructor
  * @param {!string|Type.number} name
  * @param {number} mod
+ * @param {boolean} hip
  **/
-function Type(name, mod) {
+function Type(name, mod, hip) {
     if (typeof(name) == 'number') {
 	this.base = name;
     } else {
@@ -27,6 +30,7 @@ function Type(name, mod) {
 	}
     }
     this.modifier = mod;
+    this.hasIdPtr = hip;
     this.children = null;
 }
 
@@ -71,6 +75,7 @@ Type.baserx = /([A-Za-z_][A-Za-z0-9_]*)(.*)/;
 
 /** @type {Type.number} */ Type.prototype.base;
 /** @type {number} */ Type.prototype.modifier;
+/** @type {boolean} */ Type.prototype.hasIdPtr;
 /** @type {?Array.<!Type>} */ Type.prototype.children;
 
 /**
@@ -78,7 +83,8 @@ Type.baserx = /([A-Za-z_][A-Za-z0-9_]*)(.*)/;
  * parse a type into its type tree
  *
  * grammer for types
- * type := compound-id | '(' type-ors ')' | '{' type-pairs '} | '?' type | '!' type | id '.' '<' type '>' | id '.' '<' type ',' type '>'
+ * type := typename | '(' type-ors ')' | '{' type-pairs '} | '?' type | '!' type | id '.' '<' type '>' | id '.' '<' type ',' type '>'
+ * typename := compound-id | '@' compound-id
  * type-ors := type | type '|' type-ors
  * type-pairs := type-pair | type-pair ',' type-pairs
  * type-pair := id ':' type
@@ -94,14 +100,14 @@ Type.parse = function(str)
     // get rid of multiple meanings of .
     str = str.replace(/.</g, '<');
     // now tokenize rest of string (note: compound-id will be lumped together here
-    var rawtokens = str.split(/([(){}?!<>,:|])/);
+    var rawtokens = str.split(/([(){}?!@<>,:|])/);
     var tokens = [];
     for (var i=0; i<rawtokens.length; i++) if (rawtokens[i] != "") tokens.push(rawtokens[i]);
 
     //console.log('%s => %j', str, tokens);
     // now parse it
     var type = Type.parseTokens(tokens);
-    //console.log('Parsed %s into %j', str, type);
+    //console.log('%d: Parsed %s into %j', tokens.length, str, type);
     if (tokens.length != 0) throw new Error('More stuff after parsing type: ['+tokens.join('%')+"]");
     return type;
 }
@@ -153,14 +159,23 @@ Type.parseTokens = function(tokens)
 	return type;
 
     default:
-	// not a union, what follows is a single unmodified type, i.e., tokens[0] is an id
+	// not a union, what follows is a single unmodified type, i.e., tokens[0] is an id or @id
     }
     
+    // see if there is a .ID modifier (@)
+    var id = tokens.shift();
+    var hasIdPtr = false;
+    if (id == '@') {
+	// yup, this is a class which has a .id field stored in the db or going to front end
+	hasIdPtr = true;
+	id = tokens.shift();
+    }
+
     // tokens will match: id | id < type > | id < type, type >
 
-    var id = tokens.shift();
-    type = new Type(id, mod);
+    type = new Type(id, mod, hasIdPtr);
     if (tokens.length == 0) return type;
+    //if (hasIdPtr) throw new Error('@ found on non-base type: '+id);
     if (type.isRecurable() && (tokens[0] == '<')) {
 	tokens.shift();
 	type.children = [];
@@ -172,7 +187,7 @@ Type.parseTokens = function(tokens)
 	if (tokens[0] != '>') throw new Error("Expected '>' and got "+tokens[0]);
 	tokens.shift();
 	return type;
-    }
+    } 
     return type;
 }
 
@@ -219,7 +234,37 @@ Type.parseUnion = function(tokens)
     } while (next == "|");
     if (next != ")") throw new Error("Expected a ) after a union type");
     return result;
-}
+};
+
+/**
+ * clone
+ * make a copy of this type.  If resolve is true, convert @X to X
+ *
+ * @param {boolean} resolve
+ * @return {!Type}
+ **/
+Type.prototype.clone = function(resolve)
+{
+    resolve = resolve || false;
+    var type = new Type(this.base, this.modifier, this.hasIdPtr);
+    type.name = this.name;
+    if (resolve) this.hasIdPtr = false;
+    if (this.children) {
+	type.children = [];
+	for (var i=0; i<this.children.length; i++) type.children.push(this.children[i].clone(resolve));
+    }
+    return type;
+};
+
+Type.prototype.setBaseName = function(newname)
+{
+    if (newname in Type.builtin) {
+	this.base = Type.builtin[name];
+    } else {
+	this.base = Type.number.User;
+	this.name = newname;
+    }
+};
 
 /**
  * isRecurable
@@ -233,6 +278,18 @@ Type.prototype.isRecurable = function()
     if (this.isUserType()) return false;
     //console.log("%j", this.base);
     return (Type.recurable[this.base] == 1);
+};
+
+/**
+ * isArrayType
+ * return true if this is an array
+ *
+ * @return {boolean}
+ **/
+Type.prototype.isArrayType = function()
+{
+    if (this.base == Type.number.Array) return true;
+    return false;
 }
 
 /**
@@ -246,10 +303,68 @@ Type.prototype.isUserType = function()
 {
     if (this.base == Type.number.User) return true;
     return false;
+};
+
+Type.prototype.isIdFor = function(base)
+{
+    if (this.hasIdPtr && !base.hasIdPtr && (this.name == base.name)) return true;
+    return false;
+};
+
+
+/**
+ * baseTypeName
+ * return name of base type
+ *
+ * @return {!string}
+ **/
+Type.prototype.baseTypeName = function()
+{
+    if (this.base == Type.number.User) return this.name;
+    switch (this.base) {
+    case Type.number.Array:
+	return "Array";
+
+    case Type.number.Object:
+	return "Object";
+
+    case Type.number.Boolean:
+	return "Boolean";
+
+    case Type.number.Number:
+	return "Number";
+
+    case Type.number.String:
+	return "String";
+
+    case Type.number.Union:
+	return "Union";
+
+    case Type.number.Record:
+	return "Record";
+
+    default:
+	throw new Error('unknown base');
+    }
 }
 
-Type.prototype.toString = function()
+Type.prototype.getChildType = function()
 {
+    Util.assert(((this.children != null)&&(this.children.length >= 1)), "No child type to get");
+    return this.children[0];
+}
+
+/**
+ * toString
+ * convert to a string for either the object or an id to the object
+ * defaults to the object
+ *
+ * @param {boolean} IdOrObj	// true -> include .ID if @ is here
+ * @return {!string}
+ **/
+Type.prototype.toString = function(IdOrObj)
+{
+    IdOrObj = true;
     var output = "";
     if (this.modifier) {
 	if (this.modifier == 1) output += "?";
@@ -260,16 +375,16 @@ Type.prototype.toString = function()
     case Type.number.Array:
 	output += "Array";
 	if (this.children != null) {
-	    output += (".<"+this.children[0].toString()+">");
+	    output += (".<"+this.children[0].toString(IdOrObj)+">");
 	}
 	break;
 
     case Type.number.Object:
 	output += "Object";
 	if (this.children != null) {
-	    output += (".<"+this.children[0].toString());
+	    output += (".<"+this.children[0].toString(IdOrObj));
 	    if (this.children.length == 2) {
-		output += (","+this.children[1].toString());
+		output += (","+this.children[1].toString(IdOrObj));
 	    }
 	    output += ">";
 	}
@@ -290,7 +405,7 @@ Type.prototype.toString = function()
     case Type.number.Union:
 	output += "(";
 	for (i=0; i<this.children.length; i++) {
-	    output += this.children[i].toString();
+	    output += this.children[i].toString(IdOrObj);
 	    if ((i+1)<this.children.length) output += "|";
 	}
 	output += ")";
@@ -299,7 +414,7 @@ Type.prototype.toString = function()
     case Type.number.Record:
 	output += "{";
 	for (var i=0; i<this.children.length; i++) {
-	    output += (this.children[i][0]+":"+this.children[i][1].toString());
+	    output += (this.children[i][0]+":"+this.children[i][1].toString(IdOrObj));
 	    if ((i+1)<this.children.length) output += ", ";
 	}
 	output += "}";
@@ -307,6 +422,7 @@ Type.prototype.toString = function()
 
     case Type.number.User:
 	output += this.name;
+	if (IdOrObj && this.hasIdPtr) output += ".ID";
 	break;
 
     default:
@@ -315,24 +431,28 @@ Type.prototype.toString = function()
     return output;
 }
 
-////////////////////////////////////////////////////////////////
-// testing here
-////////////////////////////////////////////////////////////////
-
-var fs = require("fs");
-var util = require("util");
-var Util = require("./util.js");
-
-var argv = require('optimist')
-    .usage('makedb [-v] def-file')
-    .describe('v', 'verbose')
-    .argv;
-
-var srcFilename = argv._[0];
-var s = fs.readFileSync(srcFilename).toString();
-var t = s.split('\n');
-for (var i=0; i<t.length; i++) {
-    //console.log("%d Parsing %s", i, t[i]);
-    var type = Type.parse(t[i]);
-    console.log("%s ==> %s", t[i], type.toString());
+if (0) {
+    ////////////////////////////////////////////////////////////////
+    // testing here
+    ////////////////////////////////////////////////////////////////
+    
+    var fs = require("fs");
+    var util = require("util");
+    var Util = require("./util.js");
+    
+    var argv = require('optimist')
+	.usage('makedb [-v] def-file')
+	.describe('v', 'verbose')
+	.argv;
+    
+    var srcFilename = argv._[0];
+    var s = fs.readFileSync(srcFilename).toString();
+    var t = s.split('\n');
+    for (var i=0; i<t.length; i++) {
+	//console.log("%d Parsing %s", i, t[i]);
+	var type = Type.parse(t[i]);
+	console.log("%s ==> %s", t[i], type.toString());
+    }
 }
+
+module.exports = Type;

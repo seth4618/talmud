@@ -166,6 +166,7 @@ Source.prototype.getChildTypeName = function()
  **/
 Source.prototype.findChildByName = function(name, cb)
 {
+    me = this;
     db.findBy(Source, 'name', name, function(children) {
 	for (i=0; i<children.length; i++) {
 	    console.log('finding against: '+((children[i].parent==null)?'null':children[i].parent._id));

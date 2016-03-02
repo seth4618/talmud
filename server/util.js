@@ -1,3 +1,4 @@
+var fs = require("fs");
 ////////////////////////////////////////////////////////////////
 // various extern defs, files, etc.
 
@@ -66,6 +67,7 @@ Util.exit = function(code) {
 	var ok = 0;
 	process.stdout.on('drain', function closure_util_66() { ok++; if (ok == 1) process.exit(code); });
 	process.stdout.write("Exiting\n");
+    process.exit(code);
 };
 
 /**

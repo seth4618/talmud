@@ -28,7 +28,7 @@ Util.inherits(<class>, DatabaseBackedObject);
 /** @type {<class>.ID} */ <class>.prototype.id;
 
 ================ instanceVar
-/** @type {<type>} */ <class>.prototype.<fname>;
+/** @type {<itype>} */ <class>.prototype.<fname>;
 ================ find
 /**
  * find
@@ -81,6 +81,27 @@ Util.inherits(<class>, DatabaseBackedObject);
 	}
     });
 };
+================ findallbyfield
+/**
+ * findAllBy<Fname>
+ * find the array of <class> by <fname>
+ *
+ * @param {<type>} key
+ * @param {function(!Array.<!<class>>)} cb
+ **/
+<class>.findAllBy<Fname> = function(key, cb)
+{
+    var result = [];
+    db.advancedQuery(<class>.table, {<fname>: key}, {_id: 1}, {}, function(results) {
+	if (results == null) results = [];
+	var len = results.length;
+	var synch = new Synchronizer(function () { cb(result); }, len+1);
+	for (var i=0; i<len; i++) {
+	   <class>.find(results[i]._id, function(x) { result.push(x); synch.done(1); });
+	}
+	synch.done(1);
+    });
+};
 ================ forfrontendHeader
 /**
  * forFrontEnd
@@ -93,9 +114,17 @@ Util.inherits(<class>, DatabaseBackedObject);
     var record = {};
     var me = this;
 ================ forfrontendfield
-    record.<fname> = me.<fname>;
+    <varname>
 ================ forfrontendcvtfield
-    if (me.<fname>) record.<fname> = me.<fname>.id; else record.<fname> = null;
+    (function(before) { if (before) return before.id; else return null; })(<varname>)
+================ forfrontendarrayHeader
+    (function(before) {
+	var after = [];
+	if (before) {
+	var len = before.length;
+	for (var i=0; i<len; i++) {
+================ forfrontendarrayTrailer
+	})(<varname>)
 ================ forfrontendTrailer
     return record;
 };
@@ -186,3 +215,31 @@ Util.inherits(<class>, DatabaseBackedObject);
 {
     //nothing special to do
 };
+================ itemheader
+/**
+ * item
+ * get items from backend for the frontend
+ *
+ * @constructor
+ *
+ **/
+function Item() {
+}
+================ item2clsheader
+Item.type2cls = function(type) {
+    var cls;
+    switch (type) {
+================ item2clstrailer
+    default:
+	throw new Error("Unknown type in type2cls:"+type);
+    }
+    return cls;
+}
+================ item2type
+Item.type2cls = function(cls) {
+    if ('ItemType' in cls) return cls.ItemType;
+    throw new Error('cls without an ItemType');
+}
+
+
+
